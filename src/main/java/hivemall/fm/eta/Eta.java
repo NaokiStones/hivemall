@@ -4,28 +4,78 @@ import java.util.Map;
 
 public class Eta {
 	protected int factor;
+	protected String etaUpdateMethod;
 	
 	protected Map<Integer, Float> etaW;
 	protected Map<Integer, float[]> etaV; 
 	
+	protected enum possibleEtaUpDateMethod {fix, time, powerTime, ada};
+	
+	// 
+	protected float eta0 = (float)0.1;
+	
+	// fix
+	/* pass*/
+	
+	// time
+	protected float t0 = (float)0.1;
+	
+	// powerTime
+	protected float power_t = (float)0.1;
+	
+	// ada
+	protected float alpha = (float)0.1;
 	protected Map<Integer, Float> accW ;
 	protected Map<Integer, float[]> accV;
 	
 	
-	
-	public Eta(int factor){
-		this.factor = factor;
+	public Eta(int factor, String etaUpdateMethod, float eth0){
+		this.factor 			= factor;
+		this.etaUpdateMethod	= etaUpdateMethod;
+		this.eta0				= eth0;
 	}
 	
 	// GET
-	public float getW0(){
-		return etaW.get(0);
+	public float getW0(int t){
+		float ret = (float)(-1.0);
+		if(etaUpdateMethod.equals(possibleEtaUpDateMethod.fix)){
+			ret = etaW.get(0);
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.time)){
+			ret = (float)1 / (float)(t0 + 0.1 * t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.powerTime)){
+			ret = eta0 / (float)Math.pow(t, power_t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.ada)){
+			ret =  (float)(eta0 * ( 1 / Math.sqrt(accW.get(0)))); 
+		}
+		return ret;
 	}
-	public float getWi(int i){
-		return etaW.get(i);
+	public float getWi(int i, int t){
+		float ret = (float)(-1.0);
+		
+		if(etaUpdateMethod.equals(possibleEtaUpDateMethod.fix)){
+			ret = etaW.get(i+1);
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.time)){
+			ret = (float)1 / (float)(t0 + 0.1 * t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.powerTime)){
+			ret = eta0 / (float)Math.pow(t, power_t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.ada)){
+			ret =  (float)(eta0 * ( 1 / Math.sqrt(accW.get(i+1)))); 
+		}
+		return ret;		
 	}
-	public float getVif(int i, int f){
-		return etaV.get(i)[f];
+	public float getVif(int i, int f, int t){
+		float ret = (float)(-1.0);
+		
+		if(etaUpdateMethod.equals(possibleEtaUpDateMethod.fix)){
+			ret = etaV.get(i+1)[f];
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.time)){
+			ret = (float)1 / (float)(t0 + 0.1 * t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.powerTime)){
+			ret = eta0 / (float)Math.pow(t, power_t);	// int1 = t
+		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.ada)){
+			ret =  (float)(eta0 * ( 1 / Math.sqrt(etaV.get(i+1)[f]))); 
+		}
+		return ret;
 	}
 	
 	// UPDATE(SET)

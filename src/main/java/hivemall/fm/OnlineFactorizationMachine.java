@@ -8,7 +8,7 @@ import hivemall.fm.eta.Eta;
 import hivemall.io.FMFeature;
 import hivemall.io.FactorizationMachineModel;
 
-public abstract class OnlineFactorizationMachine extends UDFWithOptions{
+public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	/** The number of latent factors */
 	protected int factor;
 	/** The regularization factor */
@@ -27,25 +27,38 @@ public abstract class OnlineFactorizationMachine extends UDFWithOptions{
 	protected String task;
 	/** Model */
 	protected FactorizationMachineModel fmm;
-	
+	/** Eta Update Method*/
+	protected String etaUpdateMethod;
+	/** Eth0 */
+	protected float eth0;
 	/** Eta */
-	Eta eta = new Eta(this.factor);
+	protected Eta eta = new Eta(this.factor,  etaUpdateMethod, eth0);
+	/** Time */
+	protected int time; 
+	/** Possible Task*/
+	protected enum possibleTask {regression, classification};
 
 	
-	public OnlineFactorizationMachine(String task, int factor){
+	public OnlineFactorizationMachine(String task, String etaUpdateMethod, int factor, float eth0){
 		this.task = task;
 		this.factor = factor;
+		this.etaUpdateMethod = etaUpdateMethod;
+		this.eth0 = eth0;
+		this.time = 0;
 	}
 	
 	
 	protected void train(List<FMFeature> x, final float y){
-		if(task.equals("regression")){
+		// Increment time
+		this.time++;
+		
+		if(task.equals(possibleTask.regression)){
 			//
-			float diff0 = predictForTraining(x, y) - y;
-			float grad0 = gLossW0(diff0, y);
+			float predict0 = predictForTraining(x, y);
+			float grad0 = gLossW0(predict0, y);
 			eta.updateW0(grad0);
 			float w0 = fmm.getW0();
-			float nextW0 = w0 - eta.getW0() * (grad0 + 2 * lambdaW.get(0) * w0);
+			float nextW0 = w0 - eta.getW0(time) * (grad0 + 2 * lambdaW.get(0) * w0);
 			fmm.updateW0(nextW0);
 			// 
 			for(FMFeature fmf:x){
@@ -54,42 +67,77 @@ public abstract class OnlineFactorizationMachine extends UDFWithOptions{
 				int pi = fmm.getPi(i);
 				//
 				if(!check(i)){
-					createNewColumnParams(i);
+					createNewColumnParams(pi);
 				}
 				//
 				float wi = fmm.getWi(i);
-				float diffWi = predictForTraining(x, y) - y;
+				float predictWi = predictForTraining(x, y);
 				float xi = value;
-				float gradWi = dLossWi(diffWi, y, xi);
+				float gradWi = dLossWi(predictWi, y, xi);
 				eta.updateWi(i, gradWi);
-				float nextWi = wi - eta.getWi(i) * (gradWi + 2 * lambdaW.get(pi) * wi);
-				fmm.updateWi(i, nextWi);
+				float nextWi = wi - eta.getWi(i, time) * (gradWi + 2 * lambdaW.get(pi) * wi);
+				fmm.updateWi(pi, nextWi);
 				//
 				for(int f=0, k=factor; f<k; f++){
 					float vif = fmm.getV(i, f);
 					float predictVif = predictForTraining(x, y);
 					float gradVif = dLossVif(predictVif, y, i, f, x);
 					eta.updateVif(i, f, gradVif);
-					float nextVif = vif - eta.getVif(i, f) * (gradVif + 2 * lambdaV.get(pi)[f] * vif);
+					float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * lambdaV.get(pi)[f] * vif);
+					fmm.updateVif(pi, f, nextVif);
 				}
 			}
-		}else if(task.equals("classification")){
-			
+		}else if(task.equals(possibleTask.classification)){
+			float predict0 = predictForTraining(x, y);
+			float grad0 = gLossW0(predict0, y);
+			eta.updateW0(grad0);
+			float w0 = fmm.getW0();
+			float nextW0 = w0 - eta.getW0(time) * (grad0 + 2 * lambdaW.get(0) * w0);
+			fmm.updateW0(nextW0);
+			// 
+			for(FMFeature fmf:x){
+				int i = fmf.getKey();
+				float value =fmf.getValue();
+				int pi = fmm.getPi(i);
+				//
+				if(!check(i)){
+					createNewColumnParams(pi);
+				}
+				//
+				float wi = fmm.getWi(i);
+				float predictWi = predictForTraining(x, y);
+				float xi = value;
+				float gradWi = dLossWi(predictWi, y, xi);
+				eta.updateWi(i, gradWi);
+				float nextWi = wi - eta.getWi(i, time) * (gradWi + 2 * lambdaW.get(pi) * wi);
+				fmm.updateWi(pi, nextWi);
+				//
+				for(int f=0, k=factor; f<k; f++){
+					float vif = fmm.getV(i, f);
+					float predictVif = predictForTraining(x, y);
+					float gradVif = dLossVif(predictVif, y, i, f, x);
+					eta.updateVif(i, f, gradVif);
+					float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * lambdaV.get(pi)[f] * vif);
+					fmm.updateVif(pi, f, nextVif);
+				}
+			}
 		}else{
-			
+			// S
 		}
 	}
 	
-	protected void createNewColumnParams(int i){
+	protected void createNewColumnParams(int pi){
 		// OUTPUT PARAMS
-		fmm.addW(i);
-		fmm.addV(i);
+		fmm.addW(pi);
+		fmm.addV(pi);
 		
 		// LAMBDA
-		lambdaW.put(i, (float)0);
+		lambdaW.put(pi, (float)0);
 		float[] tmp = new float[factor+1];
 		Arrays.fill(tmp, (float)0);
-		lambdaV.put(i,tmp);
+		lambdaV.put(pi,tmp);
+		
+		
 		
 	}
 	
@@ -114,35 +162,37 @@ public abstract class OnlineFactorizationMachine extends UDFWithOptions{
 	
 	protected float dLossVif(float predictVif , float y, int i, int f, List<FMFeature> x){
 		float ret = 0;
-		if(task.equals("regression")){
+		if(task.equals(possibleTask.regression)){
 			float dyVif = getDyVif(i, f, x);
 			ret += 2 * (predictVif - y) * dyVif;
-		}else if(task.equals("classification")){
+		}else if(task.equals(possibleTask.classification)){
 			
 		}
 		return ret;
 	}
-	protected float dLossWi(float lossWi, float y, float xl){
+	protected float dLossWi(float predictWi, float y, float xl){
 		float ret = 0;
-		if(task.equals("regression")){
+		if(task.equals(possibleTask.regression)){
+			float lossWi = predictWi - y;
 			ret = 2 * lossWi *xl;
-		}else if(task.equals("classification")){
+		}else if(task.equals(possibleTask.classification)){
 			
 		}
 		return ret;
 	}
-	protected float gLossW0(float lossW0, float y){
-		if(task.equals("regression")){
-			float ret = 0;
+	protected float gLossW0(float predictW0, float y){
+		float ret = 0;
+		if(task.equals(possibleTask.regression)){
+			float lossW0 = predictW0 - y;
 			ret = 2 * lossW0 * 1;
-			return ret;
-		}else if(task.equals("classification")){
+		}else if(task.equals(possibleTask.classification)){
 			
 		}
+		return ret;
 	}
 	protected float predictForTraining(List<FMFeature> x, float y){
 		float ret = 0;		
-		if(task.equals("regression")){
+		if(task.equals(possibleTask.regression)){
 			// w0
 			ret += fmm.getW0();
 			for(FMFeature dataf:x){
@@ -163,7 +213,7 @@ public abstract class OnlineFactorizationMachine extends UDFWithOptions{
 				sumV *= sumV;
 			}
 			ret += 0.5 * (sumV - sumV2);	
-		}else if(task.equals("classification")){
+		}else if(task.equals(possibleTask.classification)){
 			
 		}
 		return ret;
