@@ -8,7 +8,7 @@ public class Eta {
 	protected Map<Integer, Float> etaW;
 	protected Map<Integer, float[]> etaV; 
 	
-	protected Map<Integer, Float> accW;
+	protected Map<Integer, Float> accW ;
 	protected Map<Integer, float[]> accV;
 	
 	
@@ -38,4 +38,15 @@ public class Eta {
 	public void updateVif(int i, int f, float nextVif){
 		etaV.get(i)[f] = nextVif;
 	}
+	public void addAccWi(int i,float dWi){
+		float tmpAccWi = accW.get(i);
+		tmpAccWi += dWi;
+		accW.put(i, tmpAccWi);
+	}
+	public void addAccVif(int i, int f, float dWif){
+		float tmpAccVif = etaV.get(i)[f];
+		tmpAccVif += dWif;
+		accV.get(i)[f] = tmpAccVif;
+	}
+	
 }

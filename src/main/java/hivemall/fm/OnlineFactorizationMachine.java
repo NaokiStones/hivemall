@@ -32,8 +32,6 @@ public abstract class OnlineFactorizationMachine extends UDFWithOptions{
 	Eta eta = new Eta(this.factor);
 
 	
-	
-	
 	public OnlineFactorizationMachine(String task, int factor){
 		this.task = task;
 		this.factor = factor;

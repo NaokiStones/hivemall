@@ -125,6 +125,4 @@ public final class FactorizationMachineModel {
     	this.V.put(i, tmp);
     }
     
-  
-
 }
