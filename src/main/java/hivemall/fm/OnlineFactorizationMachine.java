@@ -114,7 +114,6 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 				try {
 					pi = fmm.getPi(i);
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				//
@@ -143,8 +142,6 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 			// S
 		}
 	}
-	
-	
 	
 	private void createNewColumnParams(int i) {
 		fmm.insertW(i);
