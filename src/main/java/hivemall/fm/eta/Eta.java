@@ -1,30 +1,33 @@
 package hivemall.fm.eta;
 
+import java.util.Arrays;
 import java.util.Map;
+
+import hivemall.utils.collections.IntOpenHashMap;
 
 public class Eta {
 	protected int factor;
 	protected String etaUpdateMethod;
 	
-	protected Map<Integer, Float> etaW;
-	protected Map<Integer, float[]> etaV; 
+	protected IntOpenHashMap<Float> etaW;
+	protected IntOpenHashMap<float[]> etaV; 
 	
 	protected enum possibleEtaUpDateMethod {fix, time, powerTime, ada};
 	
 	// 
-	protected float eta0 = (float)0.1;
+	protected float eta0 = 0.1f;
 	
 	// fix
 	/* pass*/
 	
 	// time
-	protected float t0 = (float)0.1;
+	protected float t0 = 0.1f;
 	
 	// powerTime
-	protected float power_t = (float)0.1;
+	protected float power_t = 0.1f;
 	
 	// ada
-	protected float alpha = (float)0.1;
+	protected float alpha = 0.1f;
 	protected Map<Integer, Float> accW ;
 	protected Map<Integer, float[]> accV;
 	
@@ -98,5 +101,14 @@ public class Eta {
 		tmpAccVif += dWif;
 		accV.get(i)[f] = tmpAccVif;
 	}
-	
+
+	public void insertW(int i) {
+		etaW.put(i, eta0);
+	}
+
+	public void insertV(int i) {
+		float[] tmp = new float[factor];
+		Arrays.fill(tmp, eta0);
+		etaV.put(i, tmp);
+	}
 }

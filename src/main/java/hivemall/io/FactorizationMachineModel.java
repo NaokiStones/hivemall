@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import hivemall.utils.collections.IntOpenHashMap;
+
 public final class FactorizationMachineModel {
 	
 	private final int factor;
@@ -33,9 +35,12 @@ public final class FactorizationMachineModel {
 	
 	List<Integer> pi;
 
+	protected float[] lambdaW; // getW(i, f)	
+	protected float[][] lambdaV; // getV(i, f)
+	
 	/**** OUTPUT VARIABLES ****/
-	Map<Integer, Float> w;
-	Map<Integer, float[]> V;
+	IntOpenHashMap<Float> w;
+	IntOpenHashMap<float[]> V;
 	
 	
     public FactorizationMachineModel(String initMethod, int factor, float sigma, List<Integer> piUpperLimit) {
@@ -60,6 +65,15 @@ public final class FactorizationMachineModel {
     
     public void insertNewVector(int i){
     	V.put(i, getNewVector());
+    }
+    
+    public void initLambdas(int group, int factor, float initLambdas){
+    	lambdaW = new float[group+1];
+    	Arrays.fill(lambdaW, initLambdas);
+    	lambdaV = new float[group][factor];
+    	for(int i=0; i<group; i++){
+    		Arrays.fill(lambdaV[i], initLambdas);
+    	}
     }
 
     
@@ -93,15 +107,20 @@ public final class FactorizationMachineModel {
     public float getV(int i, int f){
     	return V.get(i)[f];
     }
-    public int getPi(int i){
-    	int ret = -1;
+    public int getPi(int i) throws Exception{
     	for(int j=0; j<this.group; j++){
     		if(j <= pi.get(j)){
     			return j;
     		}
     	}
-    	System.out.println("cannnot find the group");//***
-    	return ret;
+    	throw new Exception("cannnot find the group");
+    }
+    //** lambda
+    public float getLambdaW(int pi){
+    	return lambdaW[pi];
+    }
+    public float getLambdaV(int pi, int f){
+    	return lambdaV[pi][f];
     }
   
     // UPDATE(SET)
@@ -124,5 +143,18 @@ public final class FactorizationMachineModel {
     	Arrays.fill(tmp, (float)0);
     	this.V.put(i, tmp);
     }
+
+	public void insertW(int i) {
+		w.put(i+1, 0f);
+	}
+	
+	public void insertV(int i){
+		float[] tmp =  new float[factor];
+		for(int j=0; j<factor; j++) tmp[j] = getRandom();
+		V.put(i, tmp);
+	}
+	public float getRandom(){
+		return random.nextFloat() * sigma;	// tmp
+	}
     
 }
