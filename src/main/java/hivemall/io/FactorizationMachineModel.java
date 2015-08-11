@@ -20,13 +20,12 @@ package hivemall.io;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 import hivemall.utils.collections.IntOpenHashMap;
 
 public final class FactorizationMachineModel {
-	
+
 	private final int factor;
 	private final String initMethod;
 	private final Random random;
@@ -34,9 +33,10 @@ public final class FactorizationMachineModel {
 	private final int group;
 	
 	List<Integer> pi;
-
+	
+	//protected IntOpenHashMap<float[]> lambdaV; 
 	protected float[] lambdaW; // getW(i, f)	
-	protected float[][] lambdaV; // getV(i, f)
+	//protected float[][] lambdaV; // getV(i, f)
 	
 	/**** OUTPUT VARIABLES ****/
 	IntOpenHashMap<Float> w;
@@ -44,15 +44,23 @@ public final class FactorizationMachineModel {
 	
 	
     public FactorizationMachineModel(String initMethod, int factor, float sigma, List<Integer> piUpperLimit) {
-    	this.factor = factor;
     	this.initMethod = initMethod;
+    	this.factor = factor;
     	this.sigma = sigma;
     	this.group = piUpperLimit.size();
-    	for(int i=0; i<this.group; i++){
-    		
-    	}
+    	
+    	this.V = new IntOpenHashMap<float[]>(301);
+    	this.w = new IntOpenHashMap<Float>(301);
+    	
+    	this.pi = piUpperLimit;
+    	
+    	initForW0();
     	
     	random = new Random();
+    }
+    
+    public void initForW0(){
+    	this.w.put(0, 0f);
     }
     
     public boolean exist(int i){
@@ -70,10 +78,6 @@ public final class FactorizationMachineModel {
     public void initLambdas(int group, int factor, float initLambdas){
     	lambdaW = new float[group+1];
     	Arrays.fill(lambdaW, initLambdas);
-    	lambdaV = new float[group][factor];
-    	for(int i=0; i<group; i++){
-    		Arrays.fill(lambdaV[i], initLambdas);
-    	}
     }
 
     
@@ -89,7 +93,7 @@ public final class FactorizationMachineModel {
    		float[] ret = new float[factor];
     	if(initMethod.equals("random")){
     		for(int i=0; i<factor; i++){
-    			ret[i] = (float)random.nextGaussian() * sigma;
+    			ret[i] = getRandom();
     		}
     	}else{
     		// other method
@@ -102,25 +106,43 @@ public final class FactorizationMachineModel {
     }
     public float getWi(int idx){
     	idx++;
-    	return w.get(idx);
+    	System.out.println("getWi index:" + idx);	//****
+    	/*
+    	if(!w.containsKey(idx)){
+    		w.put(idx, 0f);
+    	}
+    	*/
+    	System.out.println(w.containsKey(idx));
+    	Float v = w.get(idx);
+    	
+    	return v.floatValue();
     }
     public float getV(int i, int f){
+    	if(!V.containsKey(i)){
+    		float[] tmp = new float[factor];
+    		for(int j=0; j<factor; j++) tmp[j] = getRandom();
+    		V.put(i, tmp);
+    	}
     	return V.get(i)[f];
     }
-    public int getPi(int i) throws Exception{
+    public int getPi(int i){
+    	int ret = -1;
+    	System.out.println(i);//**
     	for(int j=0; j<this.group; j++){
-    		if(j <= pi.get(j)){
+    		System.out.println("pi:" + pi.get(j));
+    		if(i <= pi.get(j)){
     			return j;
     		}
     	}
-    	throw new Exception("cannnot find the group");
+    	
+    	/*tmp*/
+    	System.out.println("cannnot find the class of " + i);
+    	System.exit(1);
+		return ret;
     }
     //** lambda
     public float getLambdaW(int pi){
     	return lambdaW[pi];
-    }
-    public float getLambdaV(int pi, int f){
-    	return lambdaV[pi][f];
     }
   
     // UPDATE(SET)
@@ -131,30 +153,37 @@ public final class FactorizationMachineModel {
     	this.w.put(i+1, nextWi);
     }
     public void updateVif(int i, int f, float nextVif){
+    	if(!V.containsKey(i)){
+    		float[] tmpV = new float[factor];
+    		for(int j=0; j<factor; j++){
+    			tmpV[j] = getRandom();
+    		}
+    		V.put(i, tmpV);
+    	}
     	this.V.get(i)[f] = nextVif;
     }
     
-    public void addW(int i){
-    	this.w.put(i, (float)0);
-    }
-    
-    public void addV(int i){
-    	float[] tmp = new float[factor];
-    	Arrays.fill(tmp, (float)0);
-    	this.V.put(i, tmp);
-    }
-
 	public void insertW(int i) {
+		int idx = i+1;
+		System.out.println("insertW:" + idx);	//****
 		w.put(i+1, 0f);
 	}
 	
 	public void insertV(int i){
+		System.out.println("insertV:" + i);	//****
 		float[] tmp =  new float[factor];
 		for(int j=0; j<factor; j++) tmp[j] = getRandom();
 		V.put(i, tmp);
 	}
 	public float getRandom(){
 		return random.nextFloat() * sigma;	// tmp
+	}
+	
+	public IntOpenHashMap<Float> getW(){
+		return w;
+	}
+	public IntOpenHashMap<float[]> getV(){
+		return V;
 	}
     
 }
