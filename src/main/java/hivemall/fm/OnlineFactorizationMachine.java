@@ -1,12 +1,13 @@
 package hivemall.fm;
 
+import java.util.Arrays;
 import java.util.List;
 import hivemall.fm.eta.Eta;
 import hivemall.io.FMFeature;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.utils.collections.IntOpenHashMap;
 
-public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
+public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	/** The number of latent factors */
 	protected int factor;
 	/** The regularization factor */ 		// そとのPで内部の実装を変える
@@ -29,9 +30,9 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	/** Eth0 */
 	protected float eth0;
 	/** Eta */
-	protected Eta eta = new Eta(this.factor,  etaUpdateMethod, eth0);
+	protected Eta eta;
 	/** Time */
-	protected int time; 
+	protected static int time; 
 	/** Possible Task*/
 	protected enum possibleTask {regression, classification};
 	/** The number of group*/
@@ -43,22 +44,41 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	public OnlineFactorizationMachine(String task, String etaUpdateMethod, int factor, float eth0, float initLambdas){
 		this.task = task;
 		this.factor = factor;
+
 		this.etaUpdateMethod = etaUpdateMethod;
 		this.eth0 = eth0;
 		this.initLambdas = initLambdas;
 		
+		this.eta = new Eta(this.factor,  etaUpdateMethod, eth0);
+		
+		this.lambdaV = new IntOpenHashMap<float[]>(1000);
 		this.time = 0;
-		initParamsForPi();
 	}
+	
+	boolean first = true;
 	
 	protected void train(List<FMFeature> x, final float y, List<Integer> x_group){
 		// Increment time
 		this.time++;
 		
 		//
-		this.group = x_group.size();
+		if(first){
+			first = false;
+			this.group = x_group.size();
+			this.fmm = new FactorizationMachineModel("random", factor, initLambdas, x_group);
+
+			initParamsForPi();
+		}
 		
-		if(task.equals(possibleTask.regression)){
+		// check columns
+		for(FMFeature fmf_element:x){
+			int key = fmf_element.getKey();
+			if(!check(key)){
+				createNewColumnParams(key);
+			}
+		}
+		
+		if(task.equals(possibleTask.regression.toString())){ //******************************************************************************************
 			//
 			float predict0 = predictForTraining(x, y);
 			float grad0 = gLossW0_regression(predict0, y);
@@ -68,45 +88,56 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 			fmm.updateW0(nextW0);
 			// 
 			for(FMFeature fmf:x){
-				int i = fmf.getKey();
+				int key = fmf.getKey();
 				float value =fmf.getValue();
 				
 				int pi = -1;
 				try {
-					pi = fmm.getPi(i);
+					pi = fmm.getPi(key);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				//
-				if(!check(i)){
-					createNewColumnParams(i);
+				if(pi == -1){
+					System.out.println("group is not found");
+					System.exit(1);
 				}
 				//
-				float wi = fmm.getWi(i);
+				if(!check(key)){
+					createNewColumnParams(key);
+				}
+				//
+				
+				float wi = fmm.getWi(key);
 				float predictWi = predictForTraining(x, y);
 				float xi = value;
 				float gradWi = dLossWi(predictWi, y, xi);
-				eta.updateWi(i, gradWi);
-				float nextWi = wi - eta.getWi(i, time) * (gradWi + 2 * fmm.getLambdaW(pi) * wi);
-				fmm.updateWi(pi, nextWi);
+				eta.updateWi(key, gradWi);
+				float nextWi = wi - eta.getWi(key, time) * (gradWi + 2 * fmm.getLambdaW(pi) * wi);
+				fmm.updateWi(key, nextWi);
 				//
 				for(int f=0, k=factor; f<k; f++){
-					float vif = fmm.getV(i, f);
+					float vif = fmm.getV(key, f);
 					float predictVif = predictForTraining(x, y);
-					float gradVif = dLossVif(predictVif, y, i, f, x);
-					eta.updateVif(i, f, gradVif);
-					float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * lambdaV.get(pi)[f] * vif);
+					float gradVif = dLossVif(predictVif, y, key, f, x);
+					eta.updateVif(key, f, gradVif);
+					if(!lambdaV.containsKey(pi)){
+						float[] tmp = new float[factor];
+						Arrays.fill(tmp, initLambdas);
+						lambdaV.put(pi, tmp);
+					}
+					float nextVif = vif - eta.getVif(key, f, time) * (gradVif + 2 * lambdaV.get(pi)[f] * vif);
 					fmm.updateVif(pi, f, nextVif);
 				}
 			}
-		}else if(task.equals(possibleTask.classification)){
+		}else if(task.equals(possibleTask.classification.toString())){//******************************************************************************************
+			/*
 			float predict0 = predictForTraining(x, y);
 			float grad0 = gLossW0_regression(predict0, y);
 			eta.updateW0(grad0);
 			float w0 = fmm.getW0();
 			float nextW0 = w0 - eta.getW0(time) * (grad0 + 2 * fmm.getLambdaW(0) * w0);
 			fmm.updateW0(nextW0);
-			// 
+
 			for(FMFeature fmf:x){
 				int i = fmf.getKey();
 				float value =fmf.getValue();
@@ -138,14 +169,18 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 					fmm.updateVif(pi, f, nextVif);
 				}
 			}
+			*/
 		}else{
 			// S
 		}
 	}
 	
 	private void createNewColumnParams(int i) {
+		fmm.insertW(-1);	// w0
 		fmm.insertW(i);
 		fmm.insertV(i);
+		
+		eta.insertW(-1); 	// w0
 		eta.insertW(i);
 		eta.insertV(i);
 	}
@@ -155,6 +190,7 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	}
 
 	protected boolean check(int i){
+		System.out.println("check:" + i);
 		if(fmm.exist(i)){
 			return true;
 		}else{
@@ -175,37 +211,38 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	
 	protected float dLossVif(float predictVif , float y, int i, int f, List<FMFeature> x){
 		float ret = 0;
-		if(task.equals(possibleTask.regression)){
+		if(task.equals(possibleTask.regression.toString())){
 			float dyVif = getDyVif(i, f, x);
 			ret += 2 * (predictVif - y) * dyVif;
-		}else if(task.equals(possibleTask.classification)){
+		}else if(task.equals(possibleTask.classification.toString())){
 			
 		}
 		return ret;
 	}
 	protected float dLossWi(float predictWi, float y, float xl){
 		float ret = 0;
-		if(task.equals(possibleTask.regression)){
+		if(task.equals(possibleTask.regression.toString())){
 			float lossWi = predictWi - y;
 			ret = 2 * lossWi *xl;
-		}else if(task.equals(possibleTask.classification)){
+		}else if(task.equals(possibleTask.classification.toString())){
 			
 		}
 		return ret;
 	}
 	protected float gLossW0_regression(float predictW0, float y){
 		float ret = 0;
-		if(task.equals(possibleTask.regression)){
+		if(task.equals(possibleTask.regression.toString())){
 			float lossW0 = predictW0 - y;
 			ret = 2 * lossW0 * 1;
-		}else if(task.equals(possibleTask.classification)){
+		}else if(task.equals(possibleTask.classification.toString())){
 			
 		}
 		return ret;
 	}
 	protected float predictForTraining(List<FMFeature> x, float y){
 		float ret = 0;		
-		if(task.equals(possibleTask.regression)){
+		System.out.println(task);
+		if(task.equals(possibleTask.regression.toString())){
 			// w0
 			ret += fmm.getW0();
 			for(FMFeature dataf:x){
@@ -226,10 +263,48 @@ public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 				sumV *= sumV;
 			}
 			ret += 0.5 * (sumV - sumV2);	
-		}else if(task.equals(possibleTask.classification)){
+		}else if(task.equals(possibleTask.classification.toString())){
 			
 		}
 		return ret;
 	}
-
+	public float predict(List<FMFeature> x){
+		float ret = 0;
+		ret += fmm.getW0();
+		for(FMFeature dataf:x){
+			int idx = dataf.getKey();
+			ret += fmm.getWi(idx) * dataf.getValue();
+		}
+		
+		float sumV = 0;
+		float sumV2= 0;
+		for(int f=0, k=factor; f<k; f++){
+			for(FMFeature dataf:x){
+				int idx = dataf.getKey();
+				float value = dataf.getValue();
+				float vif = fmm.getV(idx, f);
+				sumV += vif * value;
+				sumV2+= (vif * vif) * (value * value);
+			}
+			sumV *= sumV;
+		}
+		ret += 0.5 * (sumV - sumV2);
+		if(task.equals(possibleTask.classification.toString())){
+			ret = sigmoid(ret);
+		}
+		return ret;
+	}
+	public float sigmoid(float xx){
+		float ret = (float) 1 / ( 1f + (float)Math.exp(xx));
+		if(ret < 0.5){
+			ret = 0;
+		}else{
+			ret = 1;
+		}
+		return ret;
+	}
+	public void showParams(){
+		System.out.println("w:" + fmm.getW());
+		System.out.println("v:" + fmm.getV());
+	}
 }
