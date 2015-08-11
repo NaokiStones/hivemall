@@ -11,11 +11,12 @@ import hivemall.io.FactorizationMachineModel;
 public abstract class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	/** The number of latent factors */
 	protected int factor;
-	/** The regularization factor */
-	protected Map<Integer, Float> lambdaW;
-	protected Map<Integer, float[]> lambdaV;
+	/** The regularization factor */ 		// そとのPで内部の実装を変える
+	protected Map<Integer, Float> lambdaW; //getW(int i) <-
+	protected Map<Integer, float[]> lambdaV; // getV(i, f)
 	
-	/** The initial standard deviation of value of V */
+	/** The
+	 *  initial standard deviation of value of V */
 	protected float sigma;
 	/** The number of iterations */
 	protected int iterations;
