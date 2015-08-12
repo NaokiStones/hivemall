@@ -18,10 +18,33 @@
  */
 package hivemall.io;
 
+import com.sun.istack.internal.FinalArrayList;
+
 public interface FactorizationMachineModel {
 
     public float getW(int i);
 
     public float getV(int i, int f);
 
+	public void initParamsForPi(int groupSize, int factor);
+
+	public void initWforW0();
+
+	public boolean check(int index);
+
+	public void addElement(int index);
+
+	public void updateW0_regression(final Feature[] x, double y, int time);
+
+	public void updateWi_regression(Feature[] x, double y, int i, int time);
+
+	public void updateV_regression(Feature[] x, double y, int f, int i, int time);
+
+	public void updateW0_classification(Feature[] x, double y, int time);
+
+	public void updateWi_classification(Feature[] x, double y, int i, int time);
+
+	public void updateV_classification(Feature[] x, double y, int f, int i, int time);
+
+    
 }

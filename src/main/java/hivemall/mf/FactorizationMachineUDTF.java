@@ -21,6 +21,7 @@ package hivemall.mf;
 import hivemall.UDTFWithOptions;
 import hivemall.io.FMArrayModel;
 import hivemall.io.FMMapModel;
+import hivemall.io.FMMapModel2;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.utils.hadoop.HiveUtils;
 import hivemall.utils.lang.Primitives;
@@ -54,9 +55,16 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 
     // Learning hyper-parameters/options    
     protected boolean classification;
-    protected float eta;
+    protected float eta0;
     protected long seed;
     protected int iterations;
+    // The number of latent factor
+    protected int factor;
+    protected float lambda0;
+    protected float sigma;
+    protected String etaUpdateMethod;
+    
+        
     /**
      * The size of x
      */
@@ -68,6 +76,8 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
      * The number of training examples processed
      */
     protected int t;
+    
+     
 
     @Override
     protected Options getOptions() {
@@ -77,6 +87,12 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         opts.addOption("seed", true, "Seed value [default: -1 (random)]");
         opts.addOption("iters", "iterations", true, "The number of iterations");
         opts.addOption("p", "size_x", true, "The size of x");
+        
+        opts.addOption("factor", "f", true, "The number of the latent variables");
+        opts.addOption("sigma", "sd", true, "The standard deviation of V");
+        opts.addOption("lambda", "l", true, "The initial lambda value");
+        opts.addOption("emethod", "etaUpdateMethod", true, "The Method to update eta");
+ 
         return opts;
     }
 
@@ -87,6 +103,11 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         int iters = 1;
         float eta = 0.1f;
         int p = -1;
+        float lambda0 = 0.01f;
+        float sigma = 0.1f;
+        
+        int tmpEtaUpdateMethod = 1;
+        
 
         CommandLine cl = null;
         if(argOIs.length >= 3) {
@@ -97,13 +118,28 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
             iters = Primitives.parseInt(cl.getOptionValue("iters"), iters);
             eta = Primitives.parseFloat(cl.getOptionValue("eta"), eta);
             p = Primitives.parseInt(cl.getOptionValue("p"), p);
+            tmpEtaUpdateMethod = Primitives.parseInt(cl.getOptionValue("etaMethod"), tmpEtaUpdateMethod);
+            lambda0 = Primitives.parseFloat(cl.getOptionValue("lambda"), lambda0);
+            sigma = Primitives.parseFloat(cl.getOptionValue("sigma"), sigma);
+        }
+
+
+        if(tmpEtaUpdateMethod == 1){
+        	this.etaUpdateMethod = "fix";
+        }else if(tmpEtaUpdateMethod == 2){
+        	this.etaUpdateMethod = "time";
+        }else if(tmpEtaUpdateMethod == 3){
+        	this.etaUpdateMethod = "powerTime";
+        }else{
+        	this.etaUpdateMethod = "ada";
         }
 
         this.classification = classication;
         this.seed = seed;
         this.iterations = iters;
-        this.eta = eta;
+        this.eta0 = eta;
         this.p = p;
+        this.lambda0 = lambda0;
 
         return cl;
     }
@@ -124,9 +160,9 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         this.yOI = HiveUtils.asDoubleCompatibleOI(argOIs[1]);
         
         if(p == -1) {
-            this.model = new FMMapModel();
+            this.model = new FMMapModel(factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
         } else {
-            this.model = new FMArrayModel(p); // TODO fix constructor
+            this.model = new FMArrayModel(p, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod); // TODO fix constructor
         }       
         this.t = 0;
 
@@ -155,8 +191,43 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         t++;
     }
 
-    protected void train(@Nonnull final Feature[] x, final double y, final int[] group) {
-
+    protected void train(@Nonnull final hivemall.io.Feature[] x, final double y, final int[] group) {
+    	// params
+    	final int featureSize = x.length;
+    	final int groupSize = group.length;
+    	
+		if(t==0){
+			model.initParamsForPi(groupSize, factor);
+			model.initWforW0();
+		}
+		
+		// Check Lacking Columns before Training
+		for(int i=0; i<featureSize; i++){
+			if(!model.check(x[i].index)){
+				model.addElement(x[i].index);
+			}
+		}
+    	
+    	// training
+		if(!classification){
+			model.updateW0_regression(x, y, t);
+			for(hivemall.io.Feature e:x){
+				int i = e.index;
+				model.updateWi_regression(x, y, i, t);
+				for(int f=0, k=factor; f<k; f++){
+					model.updateV_regression(x, y, f, i, t);
+				}
+			}
+		}else{
+			model.updateW0_classification(x, y, t);
+			for(hivemall.io.Feature e:x){
+				int i = e.index;
+				model.updateWi_classification(x, y, i, t);
+				for(int f=0, k=factor; f<k; f++){
+					model.updateV_classification(x, y, f, i, t);
+				}
+			}
+		}
     }
 
     @Override
