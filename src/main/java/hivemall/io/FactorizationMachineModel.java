@@ -76,7 +76,7 @@ public final class FactorizationMachineModel {
     }
     
     public void initLambdas(int group, int factor, float initLambdas){
-    	lambdaW = new float[group+1];
+    	this.lambdaW = new float[group+1];	// lambdaW[0]:w0, lambdaW[1]:wi[0], ...
     	Arrays.fill(lambdaW, initLambdas);
     }
 
@@ -164,8 +164,7 @@ public final class FactorizationMachineModel {
     }
     
 	public void insertW(int i) {
-		int idx = i+1;
-		System.out.println("insertW:" + idx);	//****
+		System.out.println("insertW:" + i);	//****
 		w.put(i+1, 0f);
 	}
 	

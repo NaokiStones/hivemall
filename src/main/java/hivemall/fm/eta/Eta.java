@@ -32,14 +32,14 @@ public class Eta {
 	protected IntOpenHashMap<float[]> accV;
 	
 	
-	public Eta(int factor, String etaUpdateMethod, float eth0){
+	public Eta(int factor, String etaUpdateMethod, float eta0){
 		this.factor 			= factor;
 		this.etaUpdateMethod	= etaUpdateMethod;
-		this.eta0				= eth0;
+		this.eta0				= eta0;
 		
 		
 		etaW = new IntOpenHashMap<Float>(100);
-		etaW.put(0, eth0);	// for w0
+		etaW.put(0, eta0);	// for w0
 		etaV = new IntOpenHashMap<float[]>(100);
 	}
 	
@@ -58,10 +58,11 @@ public class Eta {
 		return ret;
 	}
 	public float getWi(int i, int t){
+		if(i!=0) i++;
 		float ret = (float)(-1.0);
 		
 		if(etaUpdateMethod.equals(possibleEtaUpDateMethod.fix.toString())){
-			ret = etaW.get(i+1);
+			ret = etaW.get(i);
 		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.time.toString())){
 			ret = (float)1 / (float)(t0 + 0.1 * t);	// int1 = t
 		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.powerTime.toString())){
@@ -89,8 +90,11 @@ public class Eta {
 	}
 	
 	// UPDATE(SET)
-	public void updateW0(float nextW0){
-		etaW.put(0, nextW0);
+	public void updateW0(float gradW0){
+		float nextAccW0 = accW.get(0) + gradW0;
+		accW.put(0, nextAccW0);
+//		float nextEtaW0 = eta0;
+//		etaW.put(0, nextW0);
 	}
 	public void updateWi(int i, float nextWi){
 		etaW.put(i+1, nextWi);
@@ -102,6 +106,7 @@ public class Eta {
 		etaV.get(i)[f] = nextVif;
 	}
 	public void addAccWi(int i,float dWi){
+		if(i!=0) i++;
 		float tmpAccWi = accW.get(i);
 		tmpAccWi += dWi;
 		accW.put(i, tmpAccWi);
@@ -113,8 +118,7 @@ public class Eta {
 	}
 
 	public void insertW(int i) {
-		int idx = i+1;
-		etaW.put(idx, eta0);
+		etaW.put(i, eta0);
 	}
 
 	public void insertV(int i) {

@@ -53,9 +53,11 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 		
 		this.lambdaV = new IntOpenHashMap<float[]>(1000);
 		this.time = 0;
+		
+		
 	}
 	
-	boolean first = true;
+	protected static boolean first = true;	// flag for the first time
 	
 	protected void train(List<FMFeature> x, final float y, List<Integer> x_group){
 		// Increment time
@@ -68,13 +70,21 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 			this.fmm = new FactorizationMachineModel("random", factor, initLambdas, x_group);
 
 			initParamsForPi();
+			// w0
+			createNewColumnParamsForW0();
 		}
 		
-		// check columns
+
+		// w0 is already initialized
+		// check columns for wi
 		for(FMFeature fmf_element:x){
-			int key = fmf_element.getKey();
-			if(!check(key)){
-				createNewColumnParams(key);
+			int key = fmf_element.getKey();	// 
+				
+			if(key!=0){
+				key++;
+				if(!check(key)){
+					createNewColumnParams(key);
+				}
 			}
 		}
 		
@@ -82,23 +92,22 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 			//
 			float predict0 = predictForTraining(x, y);
 			float grad0 = gLossW0_regression(predict0, y);
-			eta.updateW0(grad0);
+			eta.addAccWi(0, grad0);
 			float w0 = fmm.getW0();
-			float nextW0 = w0 - eta.getW0(time) * (grad0 + 2 * fmm.getLambdaW(0) * w0);
+			float nextW0 = w0 - eta.getW0(time) * (grad0 + 2 * fmm.getLambdaW(0) * w0); //tmp
 			fmm.updateW0(nextW0);
 			// 
 			for(FMFeature fmf:x){
 				int key = fmf.getKey();
-				float value =fmf.getValue();
+				key++;	// only for wi
+				
+				float value = fmf.getValue();
 				
 				int pi = -1;
-				try {
-					pi = fmm.getPi(key);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+				pi = fmm.getPi(key);
+				
 				if(pi == -1){
-					System.out.println("group is not found");
+					System.out.println("group was not found");
 					System.exit(1);
 				}
 				//
@@ -175,14 +184,20 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 		}
 	}
 	
-	private void createNewColumnParams(int i) {
-		fmm.insertW(-1);	// w0
-		fmm.insertW(i);
-		fmm.insertV(i);
+	protected void createNewColumnParamsForW0() {
+		fmm.insertW(0);
 		
-		eta.insertW(-1); 	// w0
+		eta.insertW(0);
+	}
+
+	private void createNewColumnParams(int i) {
+		// i is already incremented
+		// only wi
+		fmm.insertW(i);
+		fmm.insertV(i-1);
+		
 		eta.insertW(i);
-		eta.insertV(i);
+		eta.insertV(i-1);
 	}
 
 	private void initParamsForPi() {
