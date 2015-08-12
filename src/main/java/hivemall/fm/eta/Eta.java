@@ -1,9 +1,9 @@
 package hivemall.fm.eta;
 
 import java.util.Arrays;
-import java.util.Map;
 
 import hivemall.utils.collections.IntOpenHashMap;
+import sun.awt.resources.awt_zh_TW;
 
 public class Eta {
 	protected int factor;
@@ -41,6 +41,9 @@ public class Eta {
 		etaW = new IntOpenHashMap<Float>(100);
 		etaW.put(0, eta0);	// for w0
 		etaV = new IntOpenHashMap<float[]>(100);
+		
+		accW = new IntOpenHashMap<Float>(100);
+		accV = new IntOpenHashMap<float[]>(100);
 	}
 	
 	// GET
@@ -76,8 +79,8 @@ public class Eta {
 		float ret = (float)(-1.0);
 		
 		if(etaUpdateMethod.equals(possibleEtaUpDateMethod.fix.toString())){
-			System.out.println("i :"+ i);
-			System.out.println("f :"+ f);
+//			System.out.println("i :"+ i);
+//			System.out.println("f :"+ f);
 			ret = etaV.get(i)[f];
 		}else if(etaUpdateMethod.equals(possibleEtaUpDateMethod.time.toString())){
 			ret = (float)1 / (float)(t0 + 0.1 * t);	// int1 = t
@@ -107,7 +110,19 @@ public class Eta {
 	}
 	public void addAccWi(int i,float dWi){
 		if(i!=0) i++;
-		float tmpAccWi = accW.get(i);
+		Float tmpAccWi = 0f;
+		try{
+			if(accW.get(i) == null){
+				tmpAccWi = 0f;
+			}else{
+				tmpAccWi = accW.get(i);
+			}
+		}catch(NullPointerException e){
+			tmpAccWi = 0f;
+			// tmp
+			accW.put(i, 0f);
+		}
+
 		tmpAccWi += dWi;
 		accW.put(i, tmpAccWi);
 	}

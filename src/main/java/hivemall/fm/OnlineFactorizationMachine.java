@@ -110,7 +110,7 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 					System.out.println("group was not found");
 					System.exit(1);
 				}
-				//
+				// key already incremented
 				if(!check(key)){
 					createNewColumnParams(key);
 				}
@@ -205,8 +205,9 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	}
 
 	protected boolean check(int i){
-		System.out.println("check:" + i);
+//		System.out.println("check:" + i);
 		if(fmm.exist(i)){
+//			System.out.println(i + " exists");
 			return true;
 		}else{
 			return false;
@@ -256,7 +257,7 @@ public /*abstract*/ class OnlineFactorizationMachine/* extends UDFWithOptions*/{
 	}
 	protected float predictForTraining(List<FMFeature> x, float y){
 		float ret = 0;		
-		System.out.println(task);
+//		System.out.println(task);
 		if(task.equals(possibleTask.regression.toString())){
 			// w0
 			ret += fmm.getW0();

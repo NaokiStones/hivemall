@@ -106,15 +106,17 @@ public final class FactorizationMachineModel {
     }
     public float getWi(int idx){
     	idx++;
-    	System.out.println("getWi index:" + idx);	//****
+//    	System.out.println("getWi index:" + idx);	//****
     	/*
     	if(!w.containsKey(idx)){
     		w.put(idx, 0f);
     	}
     	*/
-    	System.out.println(w.containsKey(idx));
+//    	System.out.println(w.containsKey(idx));
     	Float v = w.get(idx);
-    	
+    	if(v==null){
+    		v = 0f;
+    	}
     	return v.floatValue();
     }
     public float getV(int i, int f){
@@ -127,9 +129,9 @@ public final class FactorizationMachineModel {
     }
     public int getPi(int i){
     	int ret = -1;
-    	System.out.println(i);//**
+//    	System.out.println(i);//**
     	for(int j=0; j<this.group; j++){
-    		System.out.println("pi:" + pi.get(j));
+//    		System.out.println("pi:" + pi.get(j));
     		if(i <= pi.get(j)){
     			return j;
     		}
@@ -164,12 +166,12 @@ public final class FactorizationMachineModel {
     }
     
 	public void insertW(int i) {
-		System.out.println("insertW:" + i);	//****
+//		System.out.println("insertW:" + i);	//****
 		w.put(i+1, 0f);
 	}
 	
 	public void insertV(int i){
-		System.out.println("insertV:" + i);	//****
+//		System.out.println("insertV:" + i);	//****
 		float[] tmp =  new float[factor];
 		for(int j=0; j<factor; j++) tmp[j] = getRandom();
 		V.put(i, tmp);
