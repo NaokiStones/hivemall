@@ -153,7 +153,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         this.yOI = HiveUtils.asDoubleCompatibleOI(argOIs[1]);
 
         if(p == -1) {
-            this.model = new FMMapModel(factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
+            this.model = new FMMapModel(classification, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
         } else {
             //this.model = new FMArrayModel(p, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod); // TODO fix constructor
         }

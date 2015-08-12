@@ -11,6 +11,7 @@ public class FMMapModel implements FactorizationMachineModel {
 	// tmp Params
 	protected int tmpHashMapSize = 1000;
 	
+	String task;
 	protected int factor;
 	protected float lambdaInit;
 	
@@ -29,7 +30,7 @@ public class FMMapModel implements FactorizationMachineModel {
 	protected Eta eta;
 	
 	
-	public FMMapModel(int factor, float lambdaInit, float etaInit, final int[] x_group, float sigma, String etaUpdateMethod) {
+	public FMMapModel(boolean classification, int factor, float lambdaInit, float etaInit, final int[] x_group, float sigma, String etaUpdateMethod) {
 		this.factor = factor;
 		this.lambdaInit = lambdaInit;
 		
@@ -42,8 +43,6 @@ public class FMMapModel implements FactorizationMachineModel {
 		random = new Random();
 		random.setSeed(117);
 		
-		//this.lambdaW = new IntOpenHashMap<Float>(tmpHashMapSize);
-		//this.lambdaV = new IntOpenHashMap<float[]>(tmpHashMapSize)		
 		initParamsForPi(x_group.length, factor);
 		
 		initWforW0();
@@ -95,8 +94,8 @@ public class FMMapModel implements FactorizationMachineModel {
 	public void addElement(int index) {
 		addElementW(index);
 		addElementV(index);
-		eta.addElementW(index);
-		eta.addElementW(index);
+		eta.addElementW(index);	// eta , accW
+		eta.addElementV(index);	// eta , accV
 	}
 
 	private void addElementW(int index) {
@@ -311,6 +310,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	private float getLambdaV(int pi, int f) {
+		System.out.println(pi);
 		return V.get(pi)[f];
 	}
 
