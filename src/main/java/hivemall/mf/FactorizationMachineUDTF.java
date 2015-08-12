@@ -21,7 +21,6 @@ package hivemall.mf;
 import hivemall.UDTFWithOptions;
 import hivemall.io.FMArrayModel;
 import hivemall.io.FMMapModel;
-import hivemall.io.FMMapModel2;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.utils.hadoop.HiveUtils;
 import hivemall.utils.lang.Primitives;
@@ -45,6 +44,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
+
 
 public class FactorizationMachineUDTF extends UDTFWithOptions {
 
@@ -162,7 +162,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         if(p == -1) {
             this.model = new FMMapModel(factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
         } else {
-            this.model = new FMArrayModel(p, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod); // TODO fix constructor
+            //this.model = new FMArrayModel(p, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod); // TODO fix constructor
         }       
         this.t = 0;
 
@@ -186,9 +186,21 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         if(x == null) {
             return;
         }
+        hivemall.io.Feature[] converted_x;
+        converted_x = convertFeature(x);
 
-        train(x, y, x_group);
+        train(converted_x, y, x_group);
         t++;
+    }
+    
+    public hivemall.io.Feature[] convertFeature(Feature[] x){
+    	int featureSize = x.length;
+    	hivemall.io.Feature[] ret = new hivemall.io.Feature[featureSize];
+    	for(int i=0; i<featureSize; i++){
+    		ret[i].index = x[i].index;
+    		ret[i].value = x[i].value;
+    	}
+    	return ret;
     }
 
     protected void train(@Nonnull final hivemall.io.Feature[] x, final double y, final int[] group) {
@@ -245,11 +257,17 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         forwardObjs[1] = Wi;
         forwardObjs[2] = Arrays.asList(Vif);
 
+        
         // FIXME
         for(int i = 0; i < P; i++) {
             idx.set(i+1);
             // set Wi
-            // set Vif            
+            Wi.set(model.getW(i));
+            // set Vif
+            for(int j=0; j<factor; j++){
+            	Vif[i].set(model.getV(i, j));
+            }
+            // ?
             forward(forwardObjs);
         }
     }

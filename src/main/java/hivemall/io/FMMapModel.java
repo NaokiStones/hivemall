@@ -326,11 +326,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 	@Override
 	public float getW(int i) {
-		if(i==0){
-			return getW0();
-		}else{
-			return getW(i);
-		}
+		return getW(i);
 	}
 
 
@@ -380,4 +376,5 @@ public class FMMapModel implements FactorizationMachineModel {
 		float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * getLambdaV(pi, f) * vif);
 		updateVif(i, f, nextVif);
 	}
+
 }

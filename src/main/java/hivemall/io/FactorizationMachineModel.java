@@ -18,12 +18,11 @@
  */
 package hivemall.io;
 
-import com.sun.istack.internal.FinalArrayList;
 
 public interface FactorizationMachineModel {
 
     public float getW(int i);
-
+    
     public float getV(int i, int f);
 
 	public void initParamsForPi(int groupSize, int factor);
