@@ -179,24 +179,22 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         if(x == null) {
             return;
         }
-        hivemall.io.Feature[] converted_x;
-        converted_x = convertFeature(x);
 
-        train(converted_x, y, x_group);
+        train(x, y, x_group);
         t++;
     }
+//
+//    public hivemall.io.Feature[] convertFeature(Feature[] x) {
+//        int featureSize = x.length;
+//        hivemall.io.Feature[] ret = new hivemall.io.Feature[featureSize];
+//        for(int i = 0; i < featureSize; i++) {
+//            ret[i].index = x[i].index;
+//            ret[i].value = x[i].value;
+//        }
+//        return ret;
+//    }
 
-    public hivemall.io.Feature[] convertFeature(Feature[] x) {
-        int featureSize = x.length;
-        hivemall.io.Feature[] ret = new hivemall.io.Feature[featureSize];
-        for(int i = 0; i < featureSize; i++) {
-            ret[i].index = x[i].index;
-            ret[i].value = x[i].value;
-        }
-        return ret;
-    }
-
-    protected void train(@Nonnull final hivemall.io.Feature[] x, final double y, final int[] group) {
+    protected void train(@Nonnull final Feature[] x, final double y, final int[] group) {
         // params
         final int featureSize = x.length;
         final int groupSize = group.length;
@@ -218,7 +216,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         if(!classification) {
             model.updateW0_regression(x, y, t);
             indexForReducedFeatureVector = 0;
-            for(hivemall.io.Feature e : x) {
+            for(Feature e : x) {
                 int idx = e.index;
                 model.updateWi_regression(x, y, idx, indexForReducedFeatureVector,t);
                 indexForReducedFeatureVector++;
@@ -229,7 +227,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         } else {
             model.updateW0_classification(x, y, t);
             indexForReducedFeatureVector = 0;
-            for(hivemall.io.Feature e : x) {
+            for(Feature e : x) {
                 int i = e.index;
                 model.updateWi_classification(x, y, i, indexForReducedFeatureVector, t);
                 indexForReducedFeatureVector++;
@@ -294,13 +292,13 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         return ary;
     }
 
-    protected static final class Feature {
-        int index;
-        double value;
+    public static final class Feature {
+        public int index;
+        public double value;
 
         Feature() {}
 
-        Feature(int index, double value) {
+        public Feature(int index, double value) {
             this.index = index;
             this.value = value;
         }

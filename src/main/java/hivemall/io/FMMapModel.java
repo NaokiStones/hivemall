@@ -1,13 +1,8 @@
 package hivemall.io;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Random;
-
-import org.apache.hadoop.hive.ql.parse.HiveParser.showGrants_return;
-
-import com.sun.javafx.collections.MappingChange.Map;
-
+import hivemall.mf.FactorizationMachineUDTF.Feature;
 import hivemall.utils.collections.IntOpenHashMap;
 
 public class FMMapModel implements FactorizationMachineModel {
@@ -24,10 +19,10 @@ public class FMMapModel implements FactorizationMachineModel {
 	protected float sigma;
 	
 	// Learning Parameters
-//	IntOpenHashMap<Float> w;
-//	IntOpenHashMap<float[]> V;
-	Map<Integer, Float> w;
-	Map<Integer, Float> V;
+	IntOpenHashMap<Float> w;
+	IntOpenHashMap<float[]> V;
+//	Map<Integer, Float> w;
+//	Map<Integer, float[]> V;
 	
 	
 	float[] lambdaW;
@@ -48,8 +43,10 @@ public class FMMapModel implements FactorizationMachineModel {
 		this.sigma = sigma;
 		this.classification = classification;
 
-		this.w = new HashMap<Integer, Float>(); //new IntOpenHashMap<Float>(tmpHashMapSize);
-		this.V = new IntOpenHashMap<float[]>(tmpHashMapSize);
+		this.w = new IntOpenHashMap<Float>(100);
+		this.V = new IntOpenHashMap<float[]>(100);
+		//this.w = new HashMap<Integer, Float>(); //new IntOpenHashMap<Float>(tmpHashMapSize);
+		//this.V = new HashMap<Integer, float[]>();
 		
 		random = new Random();
 		random.setSeed(117);
@@ -129,7 +126,8 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	private float getRandom() {
-		float ret = (float)random.nextGaussian() * this.sigma;
+		//float ret = (float)random.nextGaussian() * this.sigma;
+		float ret = (float)random.nextGaussian() *0.001f;
 		return ret;
 	}
 
@@ -151,8 +149,6 @@ public class FMMapModel implements FactorizationMachineModel {
 		this.w.put(0, nextW0);
 	}
 
-
-
 	private float getLambdaW(int pi, boolean w0) {
 		if(w0){
 			return lambdaW[0];
@@ -161,13 +157,10 @@ public class FMMapModel implements FactorizationMachineModel {
 			return lambdaW[pi];
 		}
 	}
-
-
+	
 	private float getW0() {
 		return this.w.get(0);
 	}
-
-
 
 	private float gLossW0_regression(float predict0, float y) {
 		float ret = 0;
@@ -177,33 +170,49 @@ public class FMMapModel implements FactorizationMachineModel {
 		return ret;
 	}
 
+	int dummy=0;
 	private float predictForTraining(Feature[] x, double y, boolean classification) {
 		float ret = 0f;
 		
 		// w0
 		ret += getW0();
-		
+		float tmpRetW0 = ret;	// tmp
 		// wi
 		for(Feature dataf:x){
 			int idx = dataf.index;
 			float val = (float)dataf.value;
 			ret += getWi(idx) * val;
 		}
-
+		
+		float tmpRetW = ret;	// tmp
+		
 		// V
-		float sumV = 0f;
-		float sumV2= 0f;
 		for(int f=0, k=factor; f<k; f++){
+			double sumV = 0f;
+			double sumV2= 0f;
 			for(Feature dataf:x){
 				int idx = dataf.index;
-				float value = (float)dataf.value;
-				float vif = getV(idx, f);
+				double value = dataf.value;
+				double vif = getV(idx, f);
+//				System.out.println("value:" + value);	//****
+//				System.out.println("vif:" + vif);		//****
+				double tmpRet = ret;
 				sumV += vif * value;
 				sumV2+= (vif * vif) * (value * value);
+//				System.out.println("sumV:" + sumV); 	//****
+//				System.out.println("sumV2:" + sumV2); 	//****
+				if(Double.isNaN(sumV) || Double.isNaN(sumV2) || Double.isInfinite(sumV) || Double.isInfinite(sumV2)){
+					System.out.println("sumV:" + sumV); 	//****
+					System.out.println("sumV2:" + sumV2); 	//****
+					System.out.println("NaN or Inifinite");
+					System.exit(1);
+				}
+				dummy=0;
 			}
 			sumV *= sumV;
+			ret += 0.5 * (float)(sumV - sumV2);
 		}
-		ret += 0.5 * (sumV - sumV2);
+
 		
 		if(classification){
 			ret = (float)sigmoid(ret);
@@ -213,6 +222,7 @@ public class FMMapModel implements FactorizationMachineModel {
 				ret = 0f;
 			}
 		}
+		dummy=0;
 		return ret;
 	}
 
@@ -409,7 +419,6 @@ public class FMMapModel implements FactorizationMachineModel {
 		ret += getW0();
 		
 //		System.out.println("predict ret[w0]:" + ret); 	//****
-		
 		int idxForReducedFeatureVector = 0;
 		// W
 		for(Feature dataf:x){
@@ -420,24 +429,24 @@ public class FMMapModel implements FactorizationMachineModel {
 		}
 
 //		System.out.println("predict ret[W]:" + ret);	//****
-		
 		// V
-		float sumV = 0;
-		float sumV2= 0;
+
 		for(int f=0, k=factor; f<k; f++){
+			float sumV = 0;
+			float sumV2= 0;
 			for(Feature dataf:x){
-				int idx = dataf.index;
+				int j = dataf.index;
 				float value = (float)dataf.value;
-				float vif = getV(idx, f);
+				float vif = getV(j, f);
 				sumV += vif * value;
-				sumV2+= (vif * vif) * (value * value);
+				sumV2+= (vif * vif * value * value);
 			}
 			sumV *= sumV;
+			ret += 0.5 * (sumV - sumV2);
 		}
-		ret += 0.5 * (sumV - sumV2);
+
 
 //		System.out.println("predict ret[V]:" + ret);	//****
-		
 		if(classification){
 			ret = (float)sigmoid(ret);
 			if(ret > 0.5){

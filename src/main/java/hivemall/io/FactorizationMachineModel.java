@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 package hivemall.io;
-
+import hivemall.mf.FactorizationMachineUDTF.Feature;
 
 public interface FactorizationMachineModel {
 
