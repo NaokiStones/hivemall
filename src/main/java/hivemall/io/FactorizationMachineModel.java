@@ -35,15 +35,17 @@ public interface FactorizationMachineModel {
 
 	public void updateW0_regression(final Feature[] x, double y, int time);
 
-	public void updateWi_regression(Feature[] x, double y, int i, int time);
-
 	public void updateV_regression(Feature[] x, double y, int f, int i, int time);
 
 	public void updateW0_classification(Feature[] x, double y, int time);
 
-	public void updateWi_classification(Feature[] x, double y, int i, int time);
+	public void updateWi_classification(Feature[] x, double y, int i, int idxForX, int time);
 
 	public void updateV_classification(Feature[] x, double y, int f, int i, int time);
+
+	public void updateWi_regression(Feature[] x, double y, int i, int idxForX, int time);
+
+	public Float predict(Feature[] features);
 
     
 }

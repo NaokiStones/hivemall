@@ -3,6 +3,7 @@ package hivemall.io;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.apache.hadoop.hive.ql.parse.HiveParser.showGrants_return;
 
 import hivemall.utils.collections.IntOpenHashMap;
 
@@ -29,6 +30,8 @@ public class FMMapModel implements FactorizationMachineModel {
 	// Eta
 	protected Eta eta;
 	
+	boolean classification;
+	
 	
 	public FMMapModel(boolean classification, int factor, float lambdaInit, float etaInit, final int[] x_group, float sigma, String etaUpdateMethod) {
 		this.factor = factor;
@@ -36,6 +39,7 @@ public class FMMapModel implements FactorizationMachineModel {
 		
 		this.x_group = x_group;
 		this.sigma = sigma;
+		this.classification = classification;
 
 		this.w = new IntOpenHashMap<Float>(tmpHashMapSize);
 		this.V = new IntOpenHashMap<float[]>(tmpHashMapSize);
@@ -51,13 +55,10 @@ public class FMMapModel implements FactorizationMachineModel {
 	}
 
 	
-	
 	public void initWforW0() {
 		this.w.put(0, 0f);
 		this.lambdaW[0] = lambdaInit;		
 	}
-
-
 
 
 	@Override
@@ -135,6 +136,8 @@ public class FMMapModel implements FactorizationMachineModel {
 		float w0 = getW0();
 		float nextW0 = w0 - eta.getEtaW0(time) * (grad0 + 2 * getLambdaW(0, true) * w0); //tmp
 		updateW0(nextW0);
+//		System.out.println("nextW0:" + nextW0);//****
+//		System.out.println("grad0:" + grad0);//****
 	}
 
 	private void updateW0(float nextW0) {
@@ -169,16 +172,20 @@ public class FMMapModel implements FactorizationMachineModel {
 
 	private float predictForTraining(Feature[] x, double y, boolean classification) {
 		float ret = 0f;
-
+		
+		// w0
 		ret += getW0();
+		
+		// wi
 		for(Feature dataf:x){
 			int idx = dataf.index;
 			float val = (float)dataf.value;
 			ret += getWi(idx) * val;
 		}
 
-		float sumV = 0;
-		float sumV2= 0;
+		// V
+		float sumV = 0f;
+		float sumV2= 0f;
 		for(int f=0, k=factor; f<k; f++){
 			for(Feature dataf:x){
 				int idx = dataf.index;
@@ -199,7 +206,7 @@ public class FMMapModel implements FactorizationMachineModel {
 				ret = 0f;
 			}
 		}
-		return 0;
+		return ret;
 	}
 
 	private float getWi(int idx) {
@@ -217,17 +224,16 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	@Override
-	public void updateWi_regression(Feature[] x, double y, int i, int time) {
-		final int pi = pi(i);
+	public void updateWi_regression(Feature[] x, double y, int idxForBigFeature, int idxForX, int time) {
+		final int pi = pi(idxForBigFeature);
 		
-		float wi = getWi(i);
+		float wi = getWi(idxForBigFeature);
 		float predictWi = predictForTraining(x, y, false);
-		float xi = (float)x[i].value;
+		float xi = (float)x[idxForX].value;
 		float gradWi = dLossWi(predictWi, (float)y, xi, false);
-		eta.addAccWi(i, gradWi, false);
-		float nextWi = wi - eta.getWi(i, time) * (gradWi + 2 * getLambdaW(pi, false) * wi);
-		updateWi(i, nextWi);
-		
+		eta.addAccWi(idxForBigFeature, gradWi, false);
+		float nextWi = wi - eta.getWi(idxForBigFeature, time) * (gradWi + 2 * getLambdaW(pi, false) * wi);
+		updateWi(idxForBigFeature, nextWi);
 	}
 
 	private float dLossWi(float predictWi, float y, float xi, boolean classification) {
@@ -268,7 +274,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	@Override
-	public void updateV_regression(Feature[] x, double y, int f, int i, int time) {
+	public void updateV_regression(Feature[] x, double y, int i, int f, int time) {
 		final int pi = pi(i);
 		
 		float vif = getV(i, f);
@@ -310,8 +316,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	private float getLambdaV(int pi, int f) {
-		System.out.println(pi);
-		return V.get(pi)[f];
+		return lambdaV[pi][f];
 	}
 
 
@@ -349,7 +354,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	@Override
-	public void updateWi_classification(Feature[] x, double y, int i, int time) {
+	public void updateWi_classification(Feature[] x, double y, int i, int idxForReducedFeature, int time) {
 		//ret = 2 * (predict(y, record) - y) * xl;
 		final int pi = pi(i);
 		
@@ -375,6 +380,66 @@ public class FMMapModel implements FactorizationMachineModel {
 
 		float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * getLambdaV(pi, f) * vif);
 		updateVif(i, f, nextVif);
+	}
+
+
+	@Override
+	public Float predict(Feature[] x) {
+		float ret = 0f;
+		
+//		// SHOW Input
+//		for(Feature tx:x){
+//			System.out.print(tx.index + ":" + tx.value + ", ");
+//		}
+//		System.out.println("");
+//		// SHOW weight W
+//		for(Feature tx:x){
+//			System.out.print(tx.index + ":" + w.get(tx.index) + ", ");
+//		}
+//		System.out.println("");
+		
+		// W0
+		ret += getW0();
+		
+//		System.out.println("predict ret[w0]:" + ret); 	//****
+		
+		int idxForReducedFeatureVector = 0;
+		// W
+		for(Feature dataf:x){
+			int idx = dataf.index;
+			float val = (float)dataf.value;
+			ret += getWi(idxForReducedFeatureVector) * val;
+			idxForReducedFeatureVector++;
+		}
+
+//		System.out.println("predict ret[W]:" + ret);	//****
+		
+		// V
+		float sumV = 0;
+		float sumV2= 0;
+		for(int f=0, k=factor; f<k; f++){
+			for(Feature dataf:x){
+				int idx = dataf.index;
+				float value = (float)dataf.value;
+				float vif = getV(idx, f);
+				sumV += vif * value;
+				sumV2+= (vif * vif) * (value * value);
+			}
+			sumV *= sumV;
+		}
+		ret += 0.5 * (sumV - sumV2);
+
+//		System.out.println("predict ret[V]:" + ret);	//****
+		
+		if(classification){
+			ret = (float)sigmoid(ret);
+			if(ret > 0.5){
+				ret = 1f;
+			}else{
+				ret = 0f;
+			}
+		}
+		return ret;
 	}
 
 }
