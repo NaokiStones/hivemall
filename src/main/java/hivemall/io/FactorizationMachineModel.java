@@ -47,5 +47,7 @@ public interface FactorizationMachineModel {
 
 	public Float predict(Feature[] features);
 
+	void initParamsForPi(int groupSize, int factor, int col);
+
     
 }

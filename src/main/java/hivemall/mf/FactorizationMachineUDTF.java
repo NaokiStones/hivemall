@@ -195,47 +195,57 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 //    }
 
     protected void train(@Nonnull final Feature[] x, final double y, final int[] group) {
-        // params
-        final int featureSize = x.length;
-        final int groupSize = group.length;
+    	if(p == -1){
+    		// MAP MODEL
+    		// params
+    		final int featureSize = x.length;
+    		final int groupSize = group.length;
 
-        if(t == 0) {
-            model.initParamsForPi(groupSize, factor);
-            model.initWforW0();
-        }
+    		if(t == 0) {
+    			model.initParamsForPi(groupSize, factor);
+    			model.initWforW0();
+    		}
 
-        // Check Lacking Columns before Training
-        for(int i = 0; i < featureSize; i++) {
-            if(!model.check(x[i].index)) {
-                model.addElement(x[i].index);
-            }
-        }
+    		// Check Lacking Columns before Training
+    		for(int i = 0; i < featureSize; i++) {
+    			if(!model.check(x[i].index)) {
+    				model.addElement(x[i].index);
+    			}
+    		}
 
-        // training
-        int indexForReducedFeatureVector = 0;
-        if(!classification) {
-            model.updateW0_regression(x, y, t);
-            indexForReducedFeatureVector = 0;
-            for(Feature e : x) {
-                int idx = e.index;
-                model.updateWi_regression(x, y, idx, indexForReducedFeatureVector,t);
-                indexForReducedFeatureVector++;
-                for(int f = 0, k = factor; f < k; f++) {
-                    model.updateV_regression(x, y, f, idx, t);
-                }
-            }
-        } else {
-            model.updateW0_classification(x, y, t);
-            indexForReducedFeatureVector = 0;
-            for(Feature e : x) {
-                int i = e.index;
-                model.updateWi_classification(x, y, i, indexForReducedFeatureVector, t);
-                indexForReducedFeatureVector++;
-                for(int f = 0, k = factor; f < k; f++) {
-                    model.updateV_classification(x, y, f, i, t);
-                }
-            }
-        }
+    		// training
+    		int indexForReducedFeatureVector = 0;
+    		if(!classification) {
+    			model.updateW0_regression(x, y, t);
+    			indexForReducedFeatureVector = 0;
+    			for(Feature e : x) {
+    				int idx = e.index;
+    				model.updateWi_regression(x, y, idx, indexForReducedFeatureVector,t);
+    				indexForReducedFeatureVector++;
+    				for(int f = 0, k = factor; f < k; f++) {
+    					model.updateV_regression(x, y, f, idx, t);
+    				}
+    			}
+    		} else {
+    			model.updateW0_classification(x, y, t);
+    			indexForReducedFeatureVector = 0;
+    			for(Feature e : x) {
+    				int i = e.index;
+    				model.updateWi_classification(x, y, i, indexForReducedFeatureVector, t);
+    				indexForReducedFeatureVector++;
+    				for(int f = 0, k = factor; f < k; f++) {
+    					model.updateV_classification(x, y, f, i, t);
+    				}
+    			}
+    		}
+    	}else{
+    		// Matrix Model
+    		final int featureSize = x.length;
+    		final int groupSize = group.length;
+    		
+    		// 
+    		
+    	}
     }
 
     @Override

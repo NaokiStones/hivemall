@@ -295,11 +295,13 @@ public class FMMapModel implements FactorizationMachineModel {
 		final int pi = pi(i);
 		
 		float vif = getV(i, f);
+
 		float predictVif = predictForTraining(x, y, false);
 		float gradVif = dLossVif(predictVif, y, i, f, x, false);
 		eta.addAccVif(i, f, gradVif);
 
 		float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * getLambdaV(pi, f) * vif);
+//		System.out.println("nextVif:" + nextVif);
 		updateVif(i, f, nextVif);
 	}
 
@@ -456,6 +458,13 @@ public class FMMapModel implements FactorizationMachineModel {
 			}
 		}
 		return ret;
+	}
+
+
+	@Override
+	public void initParamsForPi(int groupSize, int factor, int col) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }
