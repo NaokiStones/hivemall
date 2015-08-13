@@ -214,20 +214,25 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
         }
 
         // training
+        int indexForReducedFeatureVector = 0;
         if(!classification) {
             model.updateW0_regression(x, y, t);
+            indexForReducedFeatureVector = 0;
             for(hivemall.io.Feature e : x) {
-                int i = e.index;
-                model.updateWi_regression(x, y, i, t);
+                int idx = e.index;
+                model.updateWi_regression(x, y, idx, indexForReducedFeatureVector,t);
+                indexForReducedFeatureVector++;
                 for(int f = 0, k = factor; f < k; f++) {
-                    model.updateV_regression(x, y, f, i, t);
+                    model.updateV_regression(x, y, f, idx, t);
                 }
             }
         } else {
             model.updateW0_classification(x, y, t);
+            indexForReducedFeatureVector = 0;
             for(hivemall.io.Feature e : x) {
                 int i = e.index;
-                model.updateWi_classification(x, y, i, t);
+                model.updateWi_classification(x, y, i, indexForReducedFeatureVector, t);
+                indexForReducedFeatureVector++;
                 for(int f = 0, k = factor; f < k; f++) {
                     model.updateV_classification(x, y, f, i, t);
                 }
@@ -238,13 +243,12 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
     @Override
     public void close() throws HiveException {
         int P = 0; // FIXME
-        int size = P + 1;
 
         final Object[] forwardObjs = new Object[3];
 
         final IntWritable idx = new IntWritable(0);
         final FloatWritable Wi = new FloatWritable(0.f);
-        final FloatWritable[] Vif = HiveUtils.newFloatArray(size, 0.f);
+        final FloatWritable[] Vif = HiveUtils.newFloatArray(factor, 0.f);
 
         forwardObjs[0] = idx;
         forwardObjs[1] = Wi;

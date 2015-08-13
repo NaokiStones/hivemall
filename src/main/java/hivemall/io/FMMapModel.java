@@ -1,9 +1,12 @@
 package hivemall.io;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Random;
 
 import org.apache.hadoop.hive.ql.parse.HiveParser.showGrants_return;
+
+import com.sun.javafx.collections.MappingChange.Map;
 
 import hivemall.utils.collections.IntOpenHashMap;
 
@@ -21,8 +24,12 @@ public class FMMapModel implements FactorizationMachineModel {
 	protected float sigma;
 	
 	// Learning Parameters
-	IntOpenHashMap<Float> w;
-	IntOpenHashMap<float[]> V;
+//	IntOpenHashMap<Float> w;
+//	IntOpenHashMap<float[]> V;
+	Map<Integer, Float> w;
+	Map<Integer, Float> V;
+	
+	
 	float[] lambdaW;
 	float[][] lambdaV;
 	int[] x_group;
@@ -41,7 +48,7 @@ public class FMMapModel implements FactorizationMachineModel {
 		this.sigma = sigma;
 		this.classification = classification;
 
-		this.w = new IntOpenHashMap<Float>(tmpHashMapSize);
+		this.w = new HashMap<Integer, Float>(); //new IntOpenHashMap<Float>(tmpHashMapSize);
 		this.V = new IntOpenHashMap<float[]>(tmpHashMapSize);
 		
 		random = new Random();
@@ -122,7 +129,7 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	private float getRandom() {
-		float ret = random.nextFloat() * this.sigma;
+		float ret = (float)random.nextGaussian() * this.sigma;
 		return ret;
 	}
 
