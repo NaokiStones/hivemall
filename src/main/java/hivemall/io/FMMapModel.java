@@ -67,7 +67,11 @@ public class FMMapModel implements FactorizationMachineModel {
 
 	@Override
 	public float getV(int i, int f) {
-		return V.get(i)[f];
+		if(V.get(i)[f] > 10000){
+			System.out.println(V.get(i)[f]);
+		}
+		return 0f;
+//		return V.get(i)[f] * 0.4f;
 	}
 
 	@Override
@@ -128,7 +132,7 @@ public class FMMapModel implements FactorizationMachineModel {
 	private float getRandom() {
 		//float ret = (float)random.nextGaussian() * this.sigma;
 		float ret = (float)random.nextGaussian() *0.001f;
-		return ret;
+		return ret;//************************************************ *************** ******************************
 	}
 
 
@@ -343,6 +347,7 @@ public class FMMapModel implements FactorizationMachineModel {
 	private void updateVif(int i, int f, float nextVif) {
 		float[] tmp = this.V.get(i);
 		tmp[f] = nextVif;
+//		System.out.println("nextVi[" + i + ", " + f + "]: " + nextVif);
 		this.V.put(i, tmp);
 	}
 
