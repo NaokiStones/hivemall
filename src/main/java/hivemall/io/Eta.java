@@ -3,10 +3,7 @@ package hivemall.io;
 import java.util.Arrays;
 import java.util.Random;
 
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
-
 import hivemall.utils.collections.IntOpenHashMap;
-import sun.reflect.generics.tree.VoidDescriptor;
 
 public class Eta {
 	protected int factor;

@@ -56,6 +56,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
     protected float eta0;
     protected long seed;
     protected int iterations;
+
     // The number of latent factor
     protected int factor;
     protected float lambda0;

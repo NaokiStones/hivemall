@@ -1,153 +1,250 @@
 package hivemall.io;
 
-import hivemall.mf.FactorizationMachineUDTF.Feature;
+import java.util.Arrays;
+import java.util.Random;
 
-public class FMArrayModel implements FactorizationMachineModel{
-	/** Learning Parameters*/
+import hivemall.common.EtaEstimator;
+import hivemall.io.FactorizationMachineModel2;
+import hivemall.mf.FactorizationMachineUDTF2.Feature;
+import hivemall.utils.math.MathUtils;
+
+public class FMArrayModel implements FactorizationMachineModel2 {
+	
+	// PRE DEFINED VARIABLES
+	private enum ETA_UPDATE{fix, time, powerTime, ada};
+	private final static float power_t = 0.01f;
+	private final static int total_steps = 1;
+	private final static long SEED = 11111111;
+	
+	// LEARNING PARAMS
 	private float w0;
 	private float[] w;
 	private float[][] V;
 	
+	// Regulation Variables
+	private float lambdaW0;
+	private float lambdaW;
+	private float lambdaV;
+	
+	// Eta
+	EtaEstimator eta;
+	
+	// Random
+	private Random rnd;
+	
 	private boolean classification;
-	
-	/** Regulation Parameters*/
-	private	float lambdaW0;
-	private float[] lambdaW;
-	private float[][] lambdaV;
-	
-	/** */
-	private Eta eta;
-	
-    public FMArrayModel(boolean classification, float sigma, float lambda0, int factor, float eta0, String etaUpdateMethod) {
-    	/** Initialize from Argument*/
-    	this.classification = classification;
-    	
-    	/** Initialize Without Argument*/
+	private int factor;
+	private float eta0;
+	private int[] x_group;
+	private float sigma;
+	private String etaUpdateMethod;
+	private int col;
 
-    	
-    	/** Initialize using Arguments*/
-		init(sigma, lambda0, eta0);
-    	eta = new Eta(factor, eta0, sigma, etaUpdateMethod, eta0);
-    }   
-    
-	
-	private void init(float sigma, float lambda0, float eta0){
-		// w0, w, V
-		this.w0 = 0f;
-		this.w = getUniformArray(0f);
-		this.V = getRandomMatrix(sigma);
+	public FMArrayModel(boolean classification, int factor, float lambda0, float eta0, int[] x_group, float sigma,
+			String etaUpdateMethod, int col) {
+		this.classification = classification;
+		this.factor = factor;
+		this.eta0 = eta0;
+		this.x_group = x_group;
+		this.sigma = sigma;
+		this.etaUpdateMethod = etaUpdateMethod;
+		this.col = col;
 		
-		// lambdaW0, lambdaW, lambdaV
-		lambdaW0 = lambda0;
-		lambdaW = getUniformArray(lambda0);
-		lambdaV = getUniformMatrix(lambda0);
-		
-		// etaW, etaV
-		//eta.etaW = getUniformArray(eta0);
-		//eta.etaV = getUnifor
+		// Initialize
+		initLearningParams();
+		initLambdas(lambda0);
+		try {
+			initEta(eta0);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		initRandom();
 	}
 
-	private float[][] getUniformMatrix(float lambda0) {
-		// TODO Auto-generated method stub
-		return null;
+	private void initRandom() {
+		rnd = new Random();
+		rnd.setSeed(SEED);
 	}
 
-	private float[][] getRandomMatrix(float sigma) {
-		// TODO Auto-generated method stub
-		return null;
+	private void initEta(float eta0) throws Exception {
+		if(etaUpdateMethod.equals(ETA_UPDATE.fix.toString())){
+			eta = new EtaEstimator.FixedEtaEstimator(eta0);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.time.toString())){
+			eta = new EtaEstimator.InvscalingEtaEstimator(eta0, power_t);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.powerTime.toString())){
+			eta = new EtaEstimator.SimpleEtaEstimator(eta0, total_steps);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.ada.toString())){
+			// TODO ada eta
+		}else{
+			throw new Exception("EtaUpdateMethod");
+		}
 	}
 
-	private float[][] getRandomMatrix(float sigma) {
-		// TODO Auto-generated method stub
-		return null;
+	private void initLambdas(float lambda0) {
+		this.lambdaW0 = lambda0;
+		this.lambdaW  = lambda0;
+		this.lambdaV  = lambda0;
 	}
 
-	private float[] getUniformArray(float f) {
-		// TODO Auto-generated method stub
-		return null;
+	private void initLearningParams() {
+		w0 = 0f;
+		w = new float[col];
+		Arrays.fill(w, 0f);
+		V = new float[col][factor];
+		for(int i=0; i<col; i++){
+			for(int j=0; j<factor; j++){
+				V[i][j] = (float) MathUtils.gaussian(0f, sigma, rnd);
+			}
+		}
 	}
 
 	@Override
 	public float getW(int i) {
-		// TODO Auto-generated method stub
-		return 0;
+		if(i==0){
+			return w0;
+		}else{
+			return w[i-1];
+		}
 	}
 
 	@Override
 	public float getV(int i, int f) {
-		// TODO Auto-generated method stub
-		return 0;
+		return V[i][f];
 	}
 
 	@Override
-	public void initParamsForPi(int groupSize, int factor) {
+	public void initT0(int featureSize, int factor, int groupSize) {
 		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void updateW0(Feature[] x, double y, long t) {
+		float grad0 = gLoss0(x, (float)y);
+		float nextW0 = w0 - eta.eta(t) * (grad0 + 2 * lambdaW0 * w0);
+		setW0(nextW0);
+	}
+
+	private void setW0(float nextW0) {
+		this.w0 = nextW0;
+	}
+
+	private float gLoss0(Feature[] x, float y) {
+		float ret = -1f;
+
+		float predict0 = predict(x);
+
+		if(!classification){
+			float diff = predict0 - y;
+			ret = 2 * diff * 1;
+		}else{
+			ret = (float) (MathUtils.sigmoid(predict0 * y) - 1) * y * 1;
+		}
+		return ret;
+	}
+
+	@Override
+	public float predict(Feature[] x) {
+		float ret = 0f;
+		// w0
+		ret += w0;
 		
-	}
-
-	@Override
-	public void initWforW0() {
-		// TODO Auto-generated method stub
+		// W
+		for(Feature e:x){
+			int j = e.index;
+			float xj = (float) e.value;
+			ret += w[j] * xj;
+		}
 		
-	}
-
-	@Override
-	public boolean check(int index) {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public void addElement(int index) {
-		// TODO Auto-generated method stub
+		// V
+		for(int f=0, k=factor; f<k; f++){
+			float sumVjfXj = 0f;
+			float sumV2X2 = 0f;
+			
+			for(Feature e:x){
+				int j = e.index;
+				float xj = (float) e.index;
+				float vjf= V[j][f];
+				sumVjfXj += vjf * xj;
+				sumV2X2  += (vjf * vjf * xj * xj);
+			}
+			sumVjfXj *= sumVjfXj;
+			ret += 0.5 * (sumVjfXj - sumV2X2);
+		}
 		
+		if(classification){
+			ret = (float) MathUtils.sigmoid(ret);
+			if(ret > 0.5){
+				ret = 1f;
+			}else{
+				ret = 0f;
+			}
+		}
+		return ret;
 	}
 
 	@Override
-	public void updateW0_regression(Feature[] x, double y, int time) {
-		// TODO Auto-generated method stub
-		
+	public void updateWi(Feature[] x, double y, int i, float xi, long t) {
+		float gradWi = gLossWi(x, y, xi);
+		float wi = w[i];
+		float nextWi = wi - eta.eta(t) * (gradWi + 2 * lambdaW * wi);
+		setWi(i, nextWi);
+	}
+
+	private void setWi(int i, float nextWi) {
+		w[i] = nextWi;
+	}
+
+	private float gLossWi(Feature[] x, double y, float xi) {
+		float ret = -1;
+		float predictWi = predict(x);
+		if(!classification){
+			float diff = predictWi - (float) y;
+			ret = 2 * diff * xi;
+		}else{
+			ret = (float) ((MathUtils.sigmoid(predictWi * y) - 1) * y * xi);
+		}
+		return ret;
 	}
 
 	@Override
-	public void updateV_regression(Feature[] x, double y, int f, int i, int time) {
-		// TODO Auto-generated method stub
-		
+	public void updateV(Feature[] x, double y, int i, int f, long t) {
+		float gradV = gLossV(x, y, i, f);
+		float vif = V[i][f];
+		float nextVif = vif - eta.eta(t) * (gradV + 2 * lambdaV * vif);
+		setVif(i, f, nextVif);
+	}
+
+	private void setVif(int i, int f, float nextVif) {
+		V[i][f] = nextVif;
+	}
+
+	private float gLossV(Feature[] x, double y, int i, int f) {
+		float ret = -1f;
+		float predictV = predict(x);
+		if(!classification){
+			float diff = predictV - (float) y;
+			ret = 2 * diff * gradV(x, i, f);
+		}else{
+			ret = (float)((MathUtils.sigmoid(predictV * y) - 1) * y * gradV(x, i, f));
+		}
+		return ret;
+	}
+
+	private float gradV(Feature[] x, int i, int f) {
+		float ret = 0f;
+		for(Feature e:x){
+			int j = e.index;
+			float xj= (float) e.value;
+			
+			if(j == i) continue;
+			
+			ret += V[j][f] * xj;
+		}
+		return ret;
 	}
 
 	@Override
-	public void updateW0_classification(Feature[] x, double y, int time) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void updateWi_classification(Feature[] x, double y, int i, int idxForX, int time) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void updateV_classification(Feature[] x, double y, int f, int i, int time) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void updateWi_regression(Feature[] x, double y, int i, int idxForX, int time) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public Float predict(Feature[] features) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void initParamsForPi(int groupSize, int factor, int col) {
-		// TODO Auto-generated method stub
-		
+	public void check(Feature[] x) {
+		// Do nothing
 	}
 }
