@@ -4,17 +4,17 @@ import java.util.Arrays;
 import java.util.Random;
 
 import hivemall.common.EtaEstimator;
-import hivemall.io.FactorizationMachineModel2;
-import hivemall.mf.FactorizationMachineUDTF2.Feature;
+import hivemall.io.FactorizationMachineModel;
+import hivemall.mf.FactorizationMachineUDTF.Feature;
 import hivemall.utils.math.MathUtils;
 
-public class FMArrayModel implements FactorizationMachineModel2 {
+public class FMArrayModel implements FactorizationMachineModel {
 	
 	// PRE DEFINED VARIABLES
 	private enum ETA_UPDATE{fix, time, powerTime, ada};
-	private final static float power_t = 0.01f;
-	private final static int total_steps = 1;
-	private final static long SEED = 11111111;
+	private static float power_t = 0.01f;
+	private static int total_steps = 1;
+	private static long SEED = 11111111;
 	
 	// LEARNING PARAMS
 	private float w0;
@@ -31,6 +31,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 	
 	// Random
 	private Random rnd;
+	
 	
 	private boolean classification;
 	private int factor;
@@ -51,6 +52,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 		this.col = col;
 		
 		// Initialize
+		initRandom();
 		initLearningParams();
 		initLambdas(lambda0);
 		try {
@@ -58,7 +60,6 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		initRandom();
 	}
 
 	private void initRandom() {
@@ -93,7 +94,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 		V = new float[col][factor];
 		for(int i=0; i<col; i++){
 			for(int j=0; j<factor; j++){
-				V[i][j] = (float) MathUtils.gaussian(0f, sigma, rnd);
+				V[i][j] = (float) MathUtils.gaussian(0.d, (double)sigma, rnd);
 			}
 		}
 	}
@@ -113,11 +114,6 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 	}
 
 	@Override
-	public void initT0(int featureSize, int factor, int groupSize) {
-		// TODO Auto-generated method stub
-	}
-
-	@Override
 	public void updateW0(Feature[] x, double y, long t) {
 		float grad0 = gLoss0(x, (float)y);
 		float nextW0 = w0 - eta.eta(t) * (grad0 + 2 * lambdaW0 * w0);
@@ -131,7 +127,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 	private float gLoss0(Feature[] x, float y) {
 		float ret = -1f;
 
-		float predict0 = predict(x);
+		float predict0 = predict(x, y);
 
 		if(!classification){
 			float diff = predict0 - y;
@@ -141,10 +137,10 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 		}
 		return ret;
 	}
-
-	@Override
-	public float predict(Feature[] x) {
-		float ret = 0f;
+	
+	public float predict(Feature[] x, double y) {
+		// For Training
+		double ret = 0;
 		// w0
 		ret += w0;
 		
@@ -162,15 +158,71 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 			
 			for(Feature e:x){
 				int j = e.index;
-				float xj = (float) e.index;
+				float xj = (float) e.value;
 				float vjf= V[j][f];
 				sumVjfXj += vjf * xj;
 				sumV2X2  += (vjf * vjf * xj * xj);
 			}
 			sumVjfXj *= sumVjfXj;
 			ret += 0.5 * (sumVjfXj - sumV2X2);
+			if(Double.isNaN(ret)){
+				System.out.print("");
+				System.exit(1);
+			}
+		}
+//		System.out.println(ret);
+		if(classification){
+			if(y == 1.0){
+				ret = (float) MathUtils.sigmoid(ret);
+			}else{
+				ret = 1 - (float)MathUtils.sigmoid(ret);
+			}
+			if(ret > 0.5){
+				ret = 0f;
+			}else{
+				ret = 1f;
+			}
+		}
+		if(Double.isNaN(ret)){
+			System.out.println(ret);
+			System.exit(1);
+		}
+		return (float)ret;
+	}
+	
+	@Override
+	public float predict(Feature[] x) {
+		double ret = 0;
+		// w0
+		ret += w0;
+		
+		// W
+		for(Feature e:x){
+			int j = e.index;
+			float xj = (float) e.value;
+			ret += w[j] * xj;
 		}
 		
+		// V
+		for(int f=0, k=factor; f<k; f++){
+			float sumVjfXj = 0f;
+			float sumV2X2 = 0f;
+			
+			for(Feature e:x){
+				int j = e.index;
+				float xj = (float) e.value;
+				float vjf= V[j][f];
+				sumVjfXj += vjf * xj;
+				sumV2X2  += (vjf * vjf * xj * xj);
+			}
+			sumVjfXj *= sumVjfXj;
+			ret += 0.5 * (sumVjfXj - sumV2X2);
+			if(Double.isNaN(ret)){
+				System.out.print("");
+				System.exit(1);
+			}
+		}
+//		System.out.println(ret);
 		if(classification){
 			ret = (float) MathUtils.sigmoid(ret);
 			if(ret > 0.5){
@@ -179,7 +231,11 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 				ret = 0f;
 			}
 		}
-		return ret;
+		if(Double.isNaN(ret)){
+			System.out.println(ret);
+			System.exit(1);
+		}
+		return (float)ret;
 	}
 
 	@Override
@@ -196,7 +252,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 
 	private float gLossWi(Feature[] x, double y, float xi) {
 		float ret = -1;
-		float predictWi = predict(x);
+		float predictWi = predict(x, y);
 		if(!classification){
 			float diff = predictWi - (float) y;
 			ret = 2 * diff * xi;
@@ -211,6 +267,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 		float gradV = gLossV(x, y, i, f);
 		float vif = V[i][f];
 		float nextVif = vif - eta.eta(t) * (gradV + 2 * lambdaV * vif);
+		//System.out.println("vif:" + vif + " nextVif:" + nextVif);
 		setVif(i, f, nextVif);
 	}
 
@@ -220,7 +277,7 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 
 	private float gLossV(Feature[] x, double y, int i, int f) {
 		float ret = -1f;
-		float predictV = predict(x);
+		float predictV = predict(x, y);
 		if(!classification){
 			float diff = predictV - (float) y;
 			ret = 2 * diff * gradV(x, i, f);
@@ -232,19 +289,25 @@ public class FMArrayModel implements FactorizationMachineModel2 {
 
 	private float gradV(Feature[] x, int i, int f) {
 		float ret = 0f;
+		float xi = 1f;
 		for(Feature e:x){
 			int j = e.index;
 			float xj= (float) e.value;
 			
-			if(j == i) continue;
-			
-			ret += V[j][f] * xj;
+			if(j == i){
+				xi = xj;
+				continue;
+			}else{
+				ret += V[j][f] * xj;
+			}	
 		}
+		ret *= xi;
 		return ret;
 	}
 
 	@Override
-	public void check(Feature[] x) {
-		// Do nothing
+	public void check(Feature[] xx) {
+		// do nothing 
 	}
+
 }

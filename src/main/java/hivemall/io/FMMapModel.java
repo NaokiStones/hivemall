@@ -1,475 +1,322 @@
 package hivemall.io;
 
-import java.util.Arrays;
 import java.util.Random;
+
+import hivemall.common.EtaEstimator;
+import hivemall.io.FactorizationMachineModel;
 import hivemall.mf.FactorizationMachineUDTF.Feature;
 import hivemall.utils.collections.IntOpenHashMap;
+import hivemall.utils.math.MathUtils;
 
 public class FMMapModel implements FactorizationMachineModel {
 	
-	// tmp Params
-	protected int tmpHashMapSize = 1000;
+	// PRE DEFINED VARIABLES
+	private final int INIT_MAPSIZE = 1000;
+	private enum ETA_UPDATE{fix, time, powerTime, ada};
+	private static float power_t = 0.01f;
+	private static int total_steps = 1;
+	private static long SEED = 11111111;
 	
-	String task;
-	protected int factor;
-	protected float lambdaInit;
+	// LEARNING PARAMS
+	private float w0;
+	private IntOpenHashMap<Float> w;
+	private IntOpenHashMap<float[]> V;
 	
-	// Random
-	Random random;
-	protected float sigma;
-	
-	// Learning Parameters
-	IntOpenHashMap<Float> w;
-	IntOpenHashMap<float[]> V;
-//	Map<Integer, Float> w;
-//	Map<Integer, float[]> V;
-	
-	
-	float[] lambdaW;
-	float[][] lambdaV;
-	int[] x_group;
+	// Regulation Variables
+	private float lambdaW0;
+	private float lambdaW;
+	private float lambdaV;
 	
 	// Eta
-	protected Eta eta;
+	EtaEstimator eta;
 	
-	boolean classification;
+	// Random
+	private Random rnd;
 	
 	
-	public FMMapModel(boolean classification, int factor, float lambdaInit, float etaInit, final int[] x_group, float sigma, String etaUpdateMethod) {
+	private boolean classification;
+	private int factor;
+	private float eta0;
+	private int[] x_group;
+	private float sigma;
+	private String etaUpdateMethod;
+
+	public FMMapModel(boolean classification, int factor, float lambda0, float eta0, int[] x_group, float sigma,
+			String etaUpdateMethod) {
+		this.classification = classification;
 		this.factor = factor;
-		this.lambdaInit = lambdaInit;
-		
+		this.eta0 = eta0;
 		this.x_group = x_group;
 		this.sigma = sigma;
-		this.classification = classification;
-
-		this.w = new IntOpenHashMap<Float>(100);
-		this.V = new IntOpenHashMap<float[]>(100);
-		//this.w = new HashMap<Integer, Float>(); //new IntOpenHashMap<Float>(tmpHashMapSize);
-		//this.V = new HashMap<Integer, float[]>();
+		this.etaUpdateMethod = etaUpdateMethod;
 		
-		random = new Random();
-		random.setSeed(117);
-		
-		initParamsForPi(x_group.length, factor);
-		
-		initWforW0();
-		eta = new Eta(factor, etaInit, sigma, etaUpdateMethod);
-		
-	}
-
-	
-	public void initWforW0() {
-		this.w.put(0, 0f);
-		this.lambdaW[0] = lambdaInit;		
-	}
-
-
-	@Override
-	public float getV(int i, int f) {
-		if(V.get(i)[f] > 10000){
-			System.out.println(V.get(i)[f]);
+		// Initialize
+		initLearningParams();
+		initLambdas(lambda0);
+		try {
+			initEta(eta0);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		return 0f;
-//		return V.get(i)[f] * 0.4f;
+		initRandom();
 	}
 
-	@Override
-	public void initParamsForPi(int groupSize, int factor) {
-		lambdaW = new float[groupSize+1];
-		Arrays.fill(lambdaW, lambdaInit);
-		lambdaV = new float[groupSize][factor];
-		for(int i=0; i<groupSize; i++){
-			Arrays.fill(lambdaV[i], lambdaInit);
-		}
+	private void initRandom() {
+		rnd = new Random();
+		rnd.setSeed(SEED);
 	}
 
-
-
-	@Override
-	public boolean check(int index) {
-		// Don't check w0
-		// using w
-		int indexW = index + 1;
-		if(w.containsKey(indexW)){
-			return true;
+	private void initEta(float eta0) throws Exception {
+		if(etaUpdateMethod.equals(ETA_UPDATE.fix.toString())){
+			eta = new EtaEstimator.FixedEtaEstimator(eta0);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.time.toString())){
+			eta = new EtaEstimator.InvscalingEtaEstimator(eta0, power_t);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.powerTime.toString())){
+			eta = new EtaEstimator.SimpleEtaEstimator(eta0, total_steps);
+		}else if(etaUpdateMethod.equals(ETA_UPDATE.ada.toString())){
+			// TODO ada eta
 		}else{
-			return false;
-		}
-		
-	}
-
-	@Override
-	public void addElement(int index) {
-		addElementW(index);
-		addElementV(index);
-		eta.addElementW(index);	// eta , accW
-		eta.addElementV(index);	// eta , accV
-	}
-
-	private void addElementW(int index) {
-		int idx = index + 1;
-		w.put(idx, 0f);
-	}
-
-	private void addElementV(int index) {
-		float[] tmp = getRandomFloatArray();
-		V.put(index, tmp);
-	}
-
-
-
-	private float[] getRandomFloatArray() {
-		float[] ret = new float[factor];
-		for(int tmpI=0,IMAX=factor; tmpI < IMAX; tmpI++){
-			ret[tmpI] = getRandom();
-		}
-		return ret;
-	}
-
-
-
-	private float getRandom() {
-		//float ret = (float)random.nextGaussian() * this.sigma;
-		float ret = (float)random.nextGaussian() *0.001f;
-		return ret;//************************************************ *************** ******************************
-	}
-
-
-
-	@Override
-	public void updateW0_regression(Feature[] x, double y, int time) {
-		float predict0 = predictForTraining(x, y, false);
-		float grad0 = gLossW0_regression(predict0, (float)y);
-		eta.addAccWi(0, grad0, true);
-		float w0 = getW0();
-		float nextW0 = w0 - eta.getEtaW0(time) * (grad0 + 2 * getLambdaW(0, true) * w0); //tmp
-		updateW0(nextW0);
-//		System.out.println("nextW0:" + nextW0);//****
-//		System.out.println("grad0:" + grad0);//****
-	}
-
-	private void updateW0(float nextW0) {
-		this.w.put(0, nextW0);
-	}
-
-	private float getLambdaW(int pi, boolean w0) {
-		if(w0){
-			return lambdaW[0];
-		}else{
-			pi += 1;
-			return lambdaW[pi];
+			throw new Exception("EtaUpdateMethod");
 		}
 	}
-	
-	private float getW0() {
-		return this.w.get(0);
+
+	private void initLambdas(float lambda0) {
+		this.lambdaW0 = lambda0;
+		this.lambdaW  = lambda0;
+		this.lambdaV  = lambda0;
 	}
 
-	private float gLossW0_regression(float predict0, float y) {
-		float ret = 0;
-		float lossW0 = predict0 - y;
-		ret = 2 * lossW0 * 1;
-		
-		return ret;
+	private void initLearningParams() {
+		w0 = 0f;
+		w = new IntOpenHashMap<Float>(INIT_MAPSIZE);
+		V = new IntOpenHashMap<float[]>(INIT_MAPSIZE);
 	}
-
-	int dummy=0;
-	private float predictForTraining(Feature[] x, double y, boolean classification) {
-		float ret = 0f;
-		
-		// w0
-		ret += getW0();
-		float tmpRetW0 = ret;	// tmp
-		// wi
-		for(Feature dataf:x){
-			int idx = dataf.index;
-			float val = (float)dataf.value;
-			ret += getWi(idx) * val;
-		}
-		
-		float tmpRetW = ret;	// tmp
-		
-		// V
-		for(int f=0, k=factor; f<k; f++){
-			double sumV = 0f;
-			double sumV2= 0f;
-			for(Feature dataf:x){
-				int idx = dataf.index;
-				double value = dataf.value;
-				double vif = getV(idx, f);
-//				System.out.println("value:" + value);	//****
-//				System.out.println("vif:" + vif);		//****
-				double tmpRet = ret;
-				sumV += vif * value;
-				sumV2+= (vif * vif) * (value * value);
-//				System.out.println("sumV:" + sumV); 	//****
-//				System.out.println("sumV2:" + sumV2); 	//****
-				if(Double.isNaN(sumV) || Double.isNaN(sumV2) || Double.isInfinite(sumV) || Double.isInfinite(sumV2)){
-					System.out.println("sumV:" + sumV); 	//****
-					System.out.println("sumV2:" + sumV2); 	//****
-					System.out.println("NaN or Inifinite");
-					System.exit(1);
-				}
-				dummy=0;
-			}
-			sumV *= sumV;
-			ret += 0.5 * (float)(sumV - sumV2);
-		}
-
-		
-		if(classification){
-			ret = (float)sigmoid(ret);
-			if(ret > 0.5){
-				ret = 1f;
-			}else{
-				ret = 0f;
-			}
-		}
-		dummy=0;
-		return ret;
-	}
-
-	private float getWi(int idx) {
-		idx = idx +1;
-		return this.w.get(idx);
-	}
-
-
-
-	private float sigmoid(float x) {
-		float ret = (float) 1 / ( 1f + (float)Math.exp(x));
-		return ret;
-	}
-
-
-
-	@Override
-	public void updateWi_regression(Feature[] x, double y, int idxForBigFeature, int idxForX, int time) {
-		final int pi = pi(idxForBigFeature);
-		
-		float wi = getWi(idxForBigFeature);
-		float predictWi = predictForTraining(x, y, false);
-		float xi = (float)x[idxForX].value;
-		float gradWi = dLossWi(predictWi, (float)y, xi, false);
-		eta.addAccWi(idxForBigFeature, gradWi, false);
-		float nextWi = wi - eta.getWi(idxForBigFeature, time) * (gradWi + 2 * getLambdaW(pi, false) * wi);
-		updateWi(idxForBigFeature, nextWi);
-	}
-
-	private float dLossWi(float predictWi, float y, float xi, boolean classification) {
-
-		float ret = 0;
-		if(!classification){
-			float lossWi = predictWi - y;
-			ret = 2 * lossWi *xi;
-		}else{
-			ret = (sigmoid(predictWi*y) - 1) * y * xi;
-		}
-		return ret;
-	}
-
-
-
-	private void updateWi(int i, float nextWi) {
-		int idx = i + 1;
-		this.w.put(idx, nextWi);
-	}
-
-
-
-	private int pi(int i) {
-		int sum = 0;
-		int ret = -1;
-		for(int j=0, j_max=x_group.length; j< j_max; j++){
-			if(i < sum + this.x_group[j]){
-				ret = j;
-				break;
-			}else{
-				sum += this.x_group[j];
-			}
-		}
-		return ret;
-	}
-
-
-
-	@Override
-	public void updateV_regression(Feature[] x, double y, int i, int f, int time) {
-		final int pi = pi(i);
-		
-		float vif = getV(i, f);
-
-		float predictVif = predictForTraining(x, y, false);
-		float gradVif = dLossVif(predictVif, y, i, f, x, false);
-		eta.addAccVif(i, f, gradVif);
-
-		float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * getLambdaV(pi, f) * vif);
-//		System.out.println("nextVif:" + nextVif);
-		updateVif(i, f, nextVif);
-	}
-
-
-
-	private float dLossVif(float predictVif, double y, int i, int f, Feature[] x, boolean classification) {
-		float ret = 0;
-		if(!classification){
-			float dyVif = getDyVif(i, f, x);
-			ret += 2 * (predictVif - y) * dyVif;
-		}else{
-			float dyVif = getDyVif(i, f, x);
-			ret += (sigmoid(predictVif * (float)y) - 1) * y * dyVif;
-		}
-		return ret;
-	}
-
-
-
-	private float getDyVif(int i, int f, Feature[] x) {
-		float ret = 0;
-		for(Feature fmf:x){
-			int j = fmf.index;
-			float value = (float)fmf.value;
-			if(i == j) continue;
-			ret += getV(j, f) * value;
-		}
-		return ret;
-	}
-
-
-
-	private float getLambdaV(int pi, int f) {
-		return lambdaV[pi][f];
-	}
-
-
-
-	private void updateVif(int i, int f, float nextVif) {
-		float[] tmp = this.V.get(i);
-		tmp[f] = nextVif;
-//		System.out.println("nextVi[" + i + ", " + f + "]: " + nextVif);
-		this.V.put(i, tmp);
-	}
-
-
 
 	@Override
 	public float getW(int i) {
-		return getW(i);
+		if(i==0){
+			return w0;
+		}else{
+			return w.get(i-1);
+		}
 	}
-
-
 
 	@Override
-	public void updateW0_classification(Feature[] x, double y, int time) {
-		float predict0 = predictForTraining(x, y, true);
-		float grad0 = gLossW0_classification(predict0, (float)y);
-		eta.addAccWi(0, grad0, true);
-		float w0 = getW0();
-		float nextW0 = w0 - eta.getEtaW0(time) * (grad0 + 2 * getLambdaW(0, true) * w0); //tmp
-		updateW0(nextW0);
+	public float getV(int i, int f) {
+		return V.get(i)[f];
 	}
 
-	private float gLossW0_classification(float predict0, float y) {
-		float ret = (sigmoid(predict0 * y) -1) * y * 1.0f;
+	@Override
+	public void updateW0(Feature[] x, double y, long t) {
+		float grad0 = gLoss0(x, (float)y);
+		float nextW0 = w0 - eta.eta(t) * (grad0 + 2 * lambdaW0 * w0);
+		setW0(nextW0);
+	}
+
+	private void setW0(float nextW0) {
+		this.w0 = nextW0;
+	}
+
+	private float gLoss0(Feature[] x, float y) {
+		float ret = -1f;
+
+		float predict0 = predict(x, y);
+
+		if(!classification){
+			float diff = predict0 - y;
+			ret = 2 * diff * 1;
+		}else{
+			ret = (float) (MathUtils.sigmoid(predict0 * y) - 1) * y * 1;
+		}
 		return ret;
 	}
-
-
-
-	@Override
-	public void updateWi_classification(Feature[] x, double y, int i, int idxForReducedFeature, int time) {
-		//ret = 2 * (predict(y, record) - y) * xl;
-		final int pi = pi(i);
+	
+	public float predict(Feature[] x, double y) {
+		// For Training
+		double ret = 0;
+		// w0
+		ret += w0;
 		
-		float wi = getWi(i);
-		float predictWi = predictForTraining(x, y, true);
-		float xi = (float)x[i].value;
-		float gradWi = dLossWi(predictWi, (float)y, xi, true);
-		eta.addAccWi(i, gradWi, true);
-		float nextWi = wi - eta.getWi(i, time) * (gradWi + 2 * getLambdaW(pi, false) * wi);
-		updateWi(i, nextWi);
-	}
-
-
-
-	@Override
-	public void updateV_classification(Feature[] x, double y, int f, int i, int time) {
-		final int pi = pi(i);
-		
-		float vif = getV(i, f);
-		float predictVif = predictForTraining(x, y, true);
-		float gradVif = dLossVif(predictVif, y, i, f, x, true);
-		eta.addAccVif(i, f, gradVif);
-
-		float nextVif = vif - eta.getVif(i, f, time) * (gradVif + 2 * getLambdaV(pi, f) * vif);
-		updateVif(i, f, nextVif);
-	}
-
-
-	@Override
-	public Float predict(Feature[] x) {
-		float ret = 0f;
-		
-//		// SHOW Input
-//		for(Feature tx:x){
-//			System.out.print(tx.index + ":" + tx.value + ", ");
-//		}
-//		System.out.println("");
-//		// SHOW weight W
-//		for(Feature tx:x){
-//			System.out.print(tx.index + ":" + w.get(tx.index) + ", ");
-//		}
-//		System.out.println("");
-		
-		// W0
-		ret += getW0();
-		
-//		System.out.println("predict ret[w0]:" + ret); 	//****
-		int idxForReducedFeatureVector = 0;
 		// W
-		for(Feature dataf:x){
-			int idx = dataf.index;
-			float val = (float)dataf.value;
-			ret += getWi(idxForReducedFeatureVector) * val;
-			idxForReducedFeatureVector++;
+		for(Feature e:x){
+			int j = e.index;
+			float xj = (float) e.value;
+			ret += w.get(j) * xj;
 		}
-
-//		System.out.println("predict ret[W]:" + ret);	//****
+		
 		// V
-
 		for(int f=0, k=factor; f<k; f++){
-			float sumV = 0;
-			float sumV2= 0;
-			for(Feature dataf:x){
-				int j = dataf.index;
-				float value = (float)dataf.value;
-				float vif = getV(j, f);
-				sumV += vif * value;
-				sumV2+= (vif * vif * value * value);
+			float sumVjfXj = 0f;
+			float sumV2X2 = 0f;
+			
+			for(Feature e:x){
+				int j = e.index;
+				float xj = (float) e.value;
+				float vjf= V.get(j)[f];
+				sumVjfXj += vjf * xj;
+				sumV2X2  += (vjf * vjf * xj * xj);
 			}
-			sumV *= sumV;
-			ret += 0.5 * (sumV - sumV2);
+			sumVjfXj *= sumVjfXj;
+			ret += 0.5 * (sumVjfXj - sumV2X2);
+			if(Double.isNaN(ret)){
+				System.out.print("");
+				System.exit(1);
+			}
 		}
-
-
-//		System.out.println("predict ret[V]:" + ret);	//****
+//		System.out.println(ret);
 		if(classification){
-			ret = (float)sigmoid(ret);
+			if(y == 1.0){
+				ret = (float) MathUtils.sigmoid(ret);
+			}else{
+				ret = 1 - (float)MathUtils.sigmoid(ret);
+			}
+			if(ret > 0.5){
+				ret = 0f;
+			}else{
+				ret = 1f;
+			}
+		}
+		if(Double.isNaN(ret)){
+			System.out.println(ret);
+			System.exit(1);
+		}
+		return (float)ret;
+	}
+	
+	@Override
+	public float predict(Feature[] x) {
+		double ret = 0;
+		// w0
+		ret += w0;
+		
+		// W
+		for(Feature e:x){
+			int j = e.index;
+			float xj = (float) e.value;
+			ret += w.get(j) * xj;
+		}
+		
+		// V
+		for(int f=0, k=factor; f<k; f++){
+			float sumVjfXj = 0f;
+			float sumV2X2 = 0f;
+			
+			for(Feature e:x){
+				int j = e.index;
+				float xj = (float) e.value;
+				float vjf= V.get(j)[f];
+				sumVjfXj += vjf * xj;
+				sumV2X2  += (vjf * vjf * xj * xj);
+			}
+			sumVjfXj *= sumVjfXj;
+			ret += 0.5 * (sumVjfXj - sumV2X2);
+			if(Double.isNaN(ret)){
+				System.out.print("");
+				System.exit(1);
+			}
+		}
+//		System.out.println(ret);
+		if(classification){
+			ret = (float) MathUtils.sigmoid(ret);
 			if(ret > 0.5){
 				ret = 1f;
 			}else{
 				ret = 0f;
 			}
 		}
+		if(Double.isNaN(ret)){
+			System.out.println(ret);
+			System.exit(1);
+		}
+		return (float)ret;
+	}
+
+	@Override
+	public void updateWi(Feature[] x, double y, int i, float xi, long t) {
+		float gradWi = gLossWi(x, y, xi);
+		float wi = w.get(i);
+		float nextWi = wi - eta.eta(t) * (gradWi + 2 * lambdaW * wi);
+		setWi(i, nextWi);
+	}
+
+	private void setWi(int i, float nextWi) {
+		w.put(i, nextWi);
+	}
+
+	private float gLossWi(Feature[] x, double y, float xi) {
+		float ret = -1;
+		float predictWi = predict(x, y);
+		if(!classification){
+			float diff = predictWi - (float) y;
+			ret = 2 * diff * xi;
+		}else{
+			ret = (float) ((MathUtils.sigmoid(predictWi * y) - 1) * y * xi);
+		}
 		return ret;
 	}
 
-
 	@Override
-	public void initParamsForPi(int groupSize, int factor, int col) {
-		// TODO Auto-generated method stub
-		
+	public void updateV(Feature[] x, double y, int i, int f, long t) {
+		float gradV = gLossV(x, y, i, f);
+		float vif = V.get(i)[f];
+		float nextVif = vif - eta.eta(t) * (gradV + 2 * lambdaV * vif);
+		//System.out.println("vif:" + vif + " nextVif:" + nextVif);
+		setVif(i, f, nextVif);
 	}
 
+	private void setVif(int i, int f, float nextVif) {
+		V.get(i)[f] = nextVif;
+	}
+
+	private float gLossV(Feature[] x, double y, int i, int f) {
+		float ret = -1f;
+		float predictV = predict(x, y);
+		if(!classification){
+			float diff = predictV - (float) y;
+			ret = 2 * diff * gradV(x, i, f);
+		}else{
+			ret = (float)((MathUtils.sigmoid(predictV * y) - 1) * y * gradV(x, i, f));
+		}
+		return ret;
+	}
+
+	private float gradV(Feature[] x, int i, int f) {
+		float ret = 0f;
+		float xi = 1f;
+		for(Feature e:x){
+			int j = e.index;
+			float xj= (float) e.value;
+			
+			if(j == i){
+				xi = xj;
+				continue;
+			}else{
+				ret += V.get(j)[f] * xj;
+			}	
+		}
+		ret *= xi;
+		return ret;
+	}
+
+	@Override
+	public void check(Feature[] xx) {
+		for(Feature e: xx){
+			int idx = e.index;
+			if(!w.containsKey(idx)){
+				w.put(idx, 0f);
+			}
+			if(!V.containsKey(idx)){
+				float[] tmp = getRandomFloatArray(sigma);
+				V.put(idx, tmp);
+			}
+		}
+	}
+
+	private float[] getRandomFloatArray(float sigma2) {
+		float[] ret = new float[factor];
+		for(int i=0, k=factor; i< k; i++){
+			ret[i] = (float) MathUtils.gaussian(0, sigma, rnd);
+		}
+		return ret;
+	}
 }
