@@ -21,8 +21,6 @@ package hivemall.mf;
 import hivemall.UDTFWithOptions;
 import hivemall.io.FMArrayModel;
 import hivemall.io.FMMapModel;
-import hivemall.io.FMMapModel;
-import hivemall.io.FactorizationMachineModel;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.utils.hadoop.HiveUtils;
 import hivemall.utils.lang.Primitives;
@@ -35,7 +33,6 @@ import javax.annotation.Nullable;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
-import org.apache.hadoop.hive.common.classification.InterfaceAudience.Private;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
@@ -159,10 +156,9 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 		this.yOI = HiveUtils.asDoubleCompatibleOI(argOIs[1]);
 
 		if(p == -1) {
-			// TODO 
 			this.model = new FMMapModel(classification, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
 		} else {
-			this.model = new FMArrayModel(classification, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod, p); // TODO fix constructor
+			this.model = new FMArrayModel(classification, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod, p); 
 		}
 		this.t = 0;
 
@@ -192,9 +188,6 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 	}
 
 	public void train(@Nonnull final Feature[] x, final double y, final int[] group) {
-		// params
-		final int featureSize = x.length;
-		final int groupSize = group.length;
 
 		// check
 		model.check(x);
