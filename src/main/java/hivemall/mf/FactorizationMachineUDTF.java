@@ -62,7 +62,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 	protected int factor = 20;
 	protected float lambda0;
 	protected float sigma;
-	protected String etaUpdateMethod;
+	protected String etaUpdateMethod = "fix";
 
 	/**
 	 * The size of x
@@ -126,8 +126,10 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 			this.etaUpdateMethod = "time";
 		} else if(tmpEtaUpdateMethod == 3) {
 			this.etaUpdateMethod = "powerTime";
-		} else {
+		} else if(tmpEtaUpdateMethod == 4){
 			this.etaUpdateMethod = "ada";
+		} else{
+			this.etaUpdateMethod = "fix";
 		}
 
 		this.classification = classication;

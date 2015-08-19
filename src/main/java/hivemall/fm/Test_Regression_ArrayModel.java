@@ -64,9 +64,9 @@ public class Test_Regression_ArrayModel {
 				double y =0;
 
 				if(i < ROW*0.5){
-					y = 0.1;
+					y = 1.1;
 				}else{
-					y = 0.4;
+					y = 1.8;
 				}
 				ans.add(y);
 

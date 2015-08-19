@@ -38,7 +38,7 @@ public class FMArrayModel implements FactorizationMachineModel {
 	private float eta0;
 	private int[] x_group;
 	private float sigma;
-	private String etaUpdateMethod;
+	private String etaUpdateMethod = "fix";
 	private int col;
 
 	public FMArrayModel(boolean classification, int factor, float lambda0, float eta0, int[] x_group, float sigma,

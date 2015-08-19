@@ -3,6 +3,8 @@ package hivemall.fm;
 import java.util.ArrayList;
 import java.util.Random;
 
+import org.apache.hadoop.hive.ql.parse.HiveParser.ifExists_return;
+
 import hivemall.io.FMMapModel;
 import hivemall.mf.FactorizationMachineUDTF;
 import hivemall.mf.FactorizationMachineUDTF.Feature;
@@ -21,12 +23,12 @@ public class Test_Regression_MapModel {
 		FactorizationMachineUDTF fmUDTF2 = new FactorizationMachineUDTF();
 		fmUDTF2.model = new FMMapModel(classification, factor, lambda0, eta0, x_group, sigma, etaUpdateMethod);
 		
-		int ROW = 10;
-		int COL = 40;
+		int ROW = 1000;
+		int COL = 80;
 		Random rnd = new Random();
 		rnd.setSeed(201);
 		
-		for(int numberOfIteration=0; numberOfIteration<10000; numberOfIteration++){
+		for(int numberOfIteration=0; numberOfIteration<1; numberOfIteration++){
 			// System.out.println(numberOfIteration);
 			ArrayList<Feature[]> fArrayList = new ArrayList<Feature[]>();
 			ArrayList<Double> ans = new ArrayList<Double>();
@@ -51,6 +53,7 @@ public class Test_Regression_MapModel {
 						}
 					}
 				}
+				
 				int featureSize = feature.size();
 				Feature[] x = new Feature[featureSize];
 				for(int k=0; k<featureSize; k++){
@@ -68,14 +71,28 @@ public class Test_Regression_MapModel {
 				}
 				ans.add(y);
 
+				
+				// tmp
+				for(int zz=0; zz<featureSize; zz++){
+					if(zz == 0){
+						System.out.print(feature.get(zz).index + ":" + feature.get(zz).value);
+					}else{
+						System.out.print("|" + feature.get(zz).index + ":" + feature.get(zz).value);						
+					}
+				}
+				System.out.println("," + y);
+				
 				fmUDTF2.train(x, y, x_group);
 			}
+			
 			float diff = 0f;
 			for(int ii=0; ii < fArrayList.size(); ii++){
 				double tmpDiff = (fmUDTF2.model.predict(fArrayList.get(ii)) - ans.get(ii));
 				diff += tmpDiff * tmpDiff;
 			}
-			System.out.print(diff + ",");
+//			System.out.print(diff + ",");
+			
+			
 		}
 	}
 }
