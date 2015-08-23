@@ -28,7 +28,7 @@ public class Test_Regression_MapModel {
 		Random rnd = new Random();
 		rnd.setSeed(201);
 		
-		for(int numberOfIteration=0; numberOfIteration<1; numberOfIteration++){
+		for(int numberOfIteration=0; numberOfIteration<100; numberOfIteration++){
 			// System.out.println(numberOfIteration);
 			ArrayList<Feature[]> fArrayList = new ArrayList<Feature[]>();
 			ArrayList<Double> ans = new ArrayList<Double>();
@@ -72,15 +72,15 @@ public class Test_Regression_MapModel {
 				ans.add(y);
 
 				
-				// tmp
-				for(int zz=0; zz<featureSize; zz++){
-					if(zz == 0){
-						System.out.print(feature.get(zz).index + ":" + feature.get(zz).value);
-					}else{
-						System.out.print("|" + feature.get(zz).index + ":" + feature.get(zz).value);						
-					}
-				}
-				System.out.println("," + y);
+//				// tmp
+//				for(int zz=0; zz<featureSize; zz++){
+//					if(zz == 0){
+//						System.out.print(feature.get(zz).index + ":" + feature.get(zz).value);
+//					}else{
+//						System.out.print("|" + feature.get(zz).index + ":" + feature.get(zz).value);						
+//					}
+//				}
+//				System.out.println("," + y);
 				
 				fmUDTF2.train(x, y, x_group);
 			}
@@ -90,7 +90,7 @@ public class Test_Regression_MapModel {
 				double tmpDiff = (fmUDTF2.model.predict(fArrayList.get(ii)) - ans.get(ii));
 				diff += tmpDiff * tmpDiff;
 			}
-//			System.out.print(diff + ",");
+			System.out.print(diff + ",");
 			
 			
 		}

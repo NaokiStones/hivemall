@@ -67,7 +67,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 	/**
 	 * The size of x
 	 */
-	protected int p;
+	protected int p = -1;
 
 	// TODO public -> protected
 	public FactorizationMachineModel model;
@@ -101,6 +101,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 		int iters = 1;
 		float eta = 0.1f;
 		int p = -1;
+		this.p = p;
 		float lambda0 = 0.01f;
 		float sigma = 0.1f;
 
@@ -211,7 +212,11 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 
 	@Override
 	public void close() throws HiveException {
-		int P = 0; // FIXME
+		int P = model.getSize();
+		
+		if(P==0){
+			throw new HiveException("P SIZE:" + P);
+		}
 
 		final Object[] forwardObjs = new Object[3];
 
@@ -221,12 +226,16 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 
 		forwardObjs[0] = idx;
 		forwardObjs[1] = Wi;
-		forwardObjs[2] = null;
+//		forwardObjs[2] = null;
+		forwardObjs[2] = Vif;
 
 		// W0
 		idx.set(0);
 		// ViF is null
 		Wi.set(model.getW(0)); // FIXME
+		for(int f=0; f<factor; f++){
+			Vif[f].set(0f);
+		}
 		forward(forwardObjs);
 
 		// Wi, Wif (i starts from 1..P)

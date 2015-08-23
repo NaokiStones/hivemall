@@ -17,4 +17,6 @@ public interface FactorizationMachineModel {
 	
 	public float predict(Feature[] x);
 
+	public int getSize();
+
 }

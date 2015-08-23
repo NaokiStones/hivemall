@@ -2,6 +2,8 @@ package hivemall.io;
 
 import java.util.Random;
 
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+
 import hivemall.common.EtaEstimator;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.mf.FactorizationMachineUDTF.Feature;
@@ -318,5 +320,12 @@ public class FMMapModel implements FactorizationMachineModel {
 			ret[i] = (float) MathUtils.gaussian(0, sigma, rnd);
 		}
 		return ret;
+	}
+
+
+	@Override
+	public int getSize() {
+		int size = this.w.size();
+		return size;
 	}
 }

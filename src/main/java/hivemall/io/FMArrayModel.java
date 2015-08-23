@@ -3,6 +3,8 @@ package hivemall.io;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+
 import hivemall.common.EtaEstimator;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.mf.FactorizationMachineUDTF.Feature;
@@ -50,6 +52,14 @@ public class FMArrayModel implements FactorizationMachineModel {
 		this.sigma = sigma;
 		this.etaUpdateMethod = etaUpdateMethod;
 		this.col = col;
+		
+		// TODO remove
+		try {
+			throw new HiveException("ARRAY MODEL CALLED");
+		} catch (HiveException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 		
 		// Initialize
 		initRandom();
@@ -308,6 +318,13 @@ public class FMArrayModel implements FactorizationMachineModel {
 	@Override
 	public void check(Feature[] xx) {
 		// do nothing 
+	}
+
+	@Override
+	public int getSize() {
+		// TODO Auto-generated method stub
+		int size = this.col;
+		return size;
 	}
 
 }
