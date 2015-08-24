@@ -4,6 +4,8 @@ import java.util.Random;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 
+import com.sun.org.apache.bcel.internal.generic.RET;
+
 import hivemall.common.EtaEstimator;
 import hivemall.io.FactorizationMachineModel;
 import hivemall.mf.FactorizationMachineUDTF.Feature;
@@ -104,8 +106,14 @@ public class FMMapModel implements FactorizationMachineModel {
 	}
 
 	@Override
-	public float getV(int i, int f) {
-		return V.get(i)[f];
+	public float getV(int i, int f) throws Exception {
+		float ret=0;
+		try {
+			ret = V.get(i)[f];
+		} catch (NullPointerException e) {
+			throw new Exception("V.get(i)[f] Error: i:" + i + ", f:" + f);
+		}
+		return ret;
 	}
 
 	@Override
@@ -324,15 +332,10 @@ public class FMMapModel implements FactorizationMachineModel {
 
 
 	@Override
-	public int getSize() {
+	public int getSize() throws HiveException{
 		int size = this.w.size();
 		if(size==0){
-			size = -1;
-//			try {
-//				throw new HiveException("MapModel:size is zero:" + size);
-//			} catch (HiveException e) {
-//				e.printStackTrace();
-//			}
+			throw new HiveException("FMMapModel getSize:" + size);
 		}
 		return size;
 	}

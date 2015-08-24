@@ -247,7 +247,12 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 			Wi.set(model.getW(i));
 			// set Vif
 			for(int f = 0; f < factor; f++) {
-				Vif[f].set(model.getV(i, f));
+				try {
+					Vif[f].set(model.getV(i, f));
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 			forward(forwardObjs);
 		}

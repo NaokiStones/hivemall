@@ -1,11 +1,13 @@
 package hivemall.io;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+
 import hivemall.mf.FactorizationMachineUDTF.Feature;
 
 public interface FactorizationMachineModel {
 	
 	public float getW(int i);
 	    
-	public float getV(int i, int f);
+	public float getV(int i, int f) throws Exception;
 
 	public void updateW0(Feature[] x, double y, long t);
 
@@ -17,6 +19,6 @@ public interface FactorizationMachineModel {
 	
 	public float predict(Feature[] x);
 
-	public int getSize();
+	public int getSize() throws HiveException;
 
 }
