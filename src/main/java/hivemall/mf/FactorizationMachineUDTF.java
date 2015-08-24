@@ -68,6 +68,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 	 * The size of x
 	 */
 	protected int p = -1;
+	protected int p_= 0;
 
 	// TODO public -> protected
 	public FactorizationMachineModel model;
@@ -214,7 +215,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 	public void close() throws HiveException {
 		int P = model.getSize();
 		
-		if(P==0){
+		if(P<=0){
 			throw new HiveException("P SIZE:" + P);
 		}
 
@@ -288,7 +289,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 			String s1 = s.substring(0, pos);
 			String s2 = s.substring(pos + 1);
 			int index = Integer.parseInt(s1);
-			if(index <= 0) {
+			if(index < 0) {
 				throw new HiveException("Feature index MUST be greater than 0: " + s);
 			}
 			double value = Double.parseDouble(s2);
@@ -301,7 +302,7 @@ public class FactorizationMachineUDTF extends UDTFWithOptions {
 			String s1 = s.substring(0, pos);
 			String s2 = s.substring(pos + 1);
 			int index = Integer.parseInt(s1);
-			if(index <= 0) {
+			if(index < 0) {
 				throw new HiveException("Feature index MUST be greater than 0: " + s);
 			}
 			double value = Double.parseDouble(s2);

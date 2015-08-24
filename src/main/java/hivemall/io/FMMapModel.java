@@ -326,6 +326,14 @@ public class FMMapModel implements FactorizationMachineModel {
 	@Override
 	public int getSize() {
 		int size = this.w.size();
+		if(size==0){
+			size = -1;
+//			try {
+//				throw new HiveException("MapModel:size is zero:" + size);
+//			} catch (HiveException e) {
+//				e.printStackTrace();
+//			}
+		}
 		return size;
 	}
 }
